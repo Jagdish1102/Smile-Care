@@ -16,7 +16,7 @@ public class Dashboard extends JFrame {
 	public Dashboard() {
 
 		setTitle("Smile Care Clinic - Dashboard");
-		   setIconImage(AppResources.getAppIcon());
+		setIconImage(AppResources.getAppIcon());
 		setExtendedState(JFrame.MAXIMIZED_BOTH);
 		setLocationRelativeTo(null);
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -55,7 +55,6 @@ public class Dashboard extends JFrame {
 		// Load logo
 		JLabel logoLabel = new JLabel(AppResources.getLogo());
 		leftHeaderPanel.add(logoLabel);
-		
 
 		// Welcome text
 		String userName = getCurrentUserName();
@@ -95,11 +94,11 @@ public class Dashboard extends JFrame {
 		centerPanel.add(Box.createRigidArea(new Dimension(0, 30)));
 
 		// 🔷 Buttons Grid with enhanced styling
-		JPanel gridPanel = new JPanel(new GridLayout(2, 3, 25, 25));
+		JPanel gridPanel = new JPanel(new GridLayout(2, 4, 25, 25));
 		gridPanel.setOpaque(false);
 		gridPanel.setBorder(BorderFactory.createEmptyBorder(20, 30, 30, 30));
 
-		Font btnFont = new Font("Segoe UI", Font.BOLD, 16);
+		Font btnFont = new Font("Segoe UI", Font.BOLD, 18);
 		Dimension btnSize = new Dimension(250, 120);
 
 		// Create enhanced buttons with icons
@@ -109,6 +108,7 @@ public class Dashboard extends JFrame {
 		JButton viewBillsBtn = createEnhancedButton("View Bills", btnFont, btnSize, new Color(241, 196, 15));
 		JButton medicineBtn = createEnhancedButton("Manage Medicines", btnFont, btnSize, new Color(230, 126, 34));
 		JButton logoutBtn = createEnhancedButton("Logout", btnFont, btnSize, new Color(231, 76, 60));
+		JButton generateBtn = createEnhancedButton("Generate", btnFont, btnSize, new Color(26, 188, 156));
 
 		// Add buttons to grid
 		gridPanel.add(addPatientBtn);
@@ -116,6 +116,7 @@ public class Dashboard extends JFrame {
 		gridPanel.add(billingBtn);
 		gridPanel.add(viewBillsBtn);
 		gridPanel.add(medicineBtn);
+		gridPanel.add(generateBtn); 
 		gridPanel.add(logoutBtn);
 
 		centerPanel.add(gridPanel);
@@ -165,34 +166,50 @@ public class Dashboard extends JFrame {
 		medicineBtn.addActionListener(e -> {
 			new MedicineManager().setVisible(true);
 		});
-		logoutBtn.addActionListener(e -> {
+		
+		generateBtn.addActionListener(e -> {
+		    String[] options = {"Leave Application", "Quotation"};
 
-		    int confirm = JOptionPane.showConfirmDialog(
+		    int choice = JOptionPane.showOptionDialog(
 		            this,
-		            "Are you sure you want to logout?",
-		            "Logout Confirmation",
-		            JOptionPane.YES_NO_OPTION,
-		            JOptionPane.WARNING_MESSAGE
+		            "Select what you want to generate:",
+		            "Generate",
+		            JOptionPane.DEFAULT_OPTION,
+		            JOptionPane.INFORMATION_MESSAGE,
+		            null,
+		            options,
+		            options[0]
 		    );
 
-		    if (confirm == JOptionPane.YES_OPTION) {
-
-		        // Stop running timer
-		        if (timer != null) {
-		            timer.stop();
-		        }
-
-		        // 🔹 Clear session (if you add session later)
-		        SessionManager.clearSession();   // create this class below
-
-		        // 🔹 Dispose dashboard completely
-		        dispose();
-
-		        // 🔹 Open fresh login screen
-		        SwingUtilities.invokeLater(() -> {
-		            new LoginForm().setVisible(true);
-		        });
+		    if (choice == 0) {
+		        JOptionPane.showMessageDialog(this, "Leave Application Form Coming Soon");
+		    } else if (choice == 1) {
+		        JOptionPane.showMessageDialog(this, "Quotation Form Coming Soon");
 		    }
+		});
+		logoutBtn.addActionListener(e -> {
+
+			int confirm = JOptionPane.showConfirmDialog(this, "Are you sure you want to logout?", "Logout Confirmation",
+					JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+
+			if (confirm == JOptionPane.YES_OPTION) {
+
+				// Stop running timer
+				if (timer != null) {
+					timer.stop();
+				}
+
+				// 🔹 Clear session (if you add session later)
+				SessionManager.clearSession(); // create this class below
+
+				// 🔹 Dispose dashboard completely
+				dispose();
+
+				// 🔹 Open fresh login screen
+				SwingUtilities.invokeLater(() -> {
+					new LoginForm().setVisible(true);
+				});
+			}
 		});
 	}
 
@@ -250,29 +267,30 @@ public class Dashboard extends JFrame {
 	// 🔹 Create welcome card
 	private JPanel createWelcomeCard() {
 
-	    ImageIcon bgIcon = new ImageIcon(getClass().getResource("/resources/smile Care.png"));
-	    Image bgImage = bgIcon.getImage();
+		ImageIcon bgIcon = new ImageIcon(getClass().getResource("/resources/Smile_Care.png"));
+		Image bgImage = bgIcon.getImage();
 
-	    JPanel card = new JPanel() {
-	        @Override
-	        protected void paintComponent(Graphics g) {
-	            super.paintComponent(g);
+		JPanel card = new JPanel() {
+			@Override
+			protected void paintComponent(Graphics g) {
+				super.paintComponent(g);
 
-	            Graphics2D g2d = (Graphics2D) g.create();
-	            g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+				Graphics2D g2d = (Graphics2D) g.create();
+				g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
 
-	            // Draw full wallpaper
-	            g2d.drawImage(bgImage, 0, 0, getWidth(), getHeight(), this);
+				// Draw full wallpaper
+				g2d.drawImage(bgImage, 0, 0, getWidth(), getHeight(), this);
 
-	            g2d.dispose();
-	        }
-	    };
+				g2d.dispose();
+			}
+		};
 
-	    card.setLayout(new BorderLayout());
-	    card.setOpaque(false);
+		card.setLayout(new BorderLayout());
+		card.setOpaque(false);
 
-	    return card;
+		return card;
 	}
+
 	// 🔹 Create individual stat card
 	private JPanel createStatCard(String title, String value, Color color) {
 		JPanel card = new JPanel() {
@@ -309,9 +327,6 @@ public class Dashboard extends JFrame {
 
 		return card;
 	}
-	
-	
-
 
 	// 🔹 Update date and time
 	private void updateDateTime() {
@@ -321,11 +336,8 @@ public class Dashboard extends JFrame {
 
 	// 🔹 Get current user name (implement based on your session management)
 	private String getCurrentUserName() {
-	    return util.SessionManager.getUser() != null 
-	           ? util.SessionManager.getUser() 
-	           : "User";
+		return util.SessionManager.getUser() != null ? util.SessionManager.getUser() : "User";
 	}
-
 
 	@Override
 	public void dispose() {

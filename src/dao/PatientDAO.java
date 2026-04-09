@@ -2,407 +2,241 @@ package dao;
 
 import dhule_Hospital_database.DBConnection;
 import model.Patient;
-import java.sql.ResultSet;
-import java.sql.Statement;
+
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-
 public class PatientDAO {
 
-	public static boolean addPatient(Patient p) {
-
-		String sql = "INSERT INTO patients(name, age, gender, phone, address, disease, date) VALUES(?,?,?,?,?,?,?)";
-
-		try (Connection conn = DBConnection.connect(); PreparedStatement ps = conn.prepareStatement(sql)) {
-
-			ps.setString(1, p.getName());
-			ps.setInt(2, p.getAge());
-			ps.setString(3, p.getGender());
-			ps.setString(4, p.getPhone());
-			ps.setString(5, p.getAddress());
-			ps.setString(6, p.getDisease());
-			ps.setString(7, p.getDate());
-		
-
-			ps.executeUpdate();
-			return true;
-
-		} catch (Exception e) {
-			e.printStackTrace();
-			return false;
-		}
-	}
-
-	public static List<Patient> getAllPatients() {
-
-		List<Patient> list = new ArrayList<>();
-		String sql = "SELECT * FROM patients";
-
-		try (Connection conn = DBConnection.connect();
-				PreparedStatement ps = conn.prepareStatement(sql);
-				ResultSet rs = ps.executeQuery()) {
-
-			while (rs.next()) {
-				Patient p = new Patient(rs.getInt("id"), rs.getString("name"), rs.getInt("age"), rs.getString("gender"),
-						rs.getString("phone"), rs.getString("address"), rs.getString("disease"), rs.getString("date"));
-				list.add(p);
-			}
-
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-
-		return list;
-	}
-
-	public static boolean deletePatient(int id) {
-
-		String sql = "DELETE FROM patients WHERE id=?";
-
-		try (Connection conn = DBConnection.connect(); PreparedStatement ps = conn.prepareStatement(sql)) {
-
-			ps.setInt(1, id);
-			ps.executeUpdate();
-			return true;
-
-		} catch (Exception e) {
-			e.printStackTrace();
-			return false;
-		}
-	}
-
-//	public static List<Patient> searchPatients(String keyword) {
-//
-//		List<Patient> list = new ArrayList<>();
-//		String sql = "SELECT * FROM patients WHERE name LIKE ? OR phone LIKE ?";
-//
-//		try (Connection conn = DBConnection.connect(); PreparedStatement ps = conn.prepareStatement(sql)) {
-//
-//			ps.setString(1, "%" + keyword + "%");
-//			ps.setString(2, "%" + keyword + "%");
-//
-//			ResultSet rs = ps.executeQuery();
-//
-//			while (rs.next()) {
-//				Patient p = new Patient(rs.getInt("id"), rs.getString("name"), rs.getInt("age"), rs.getString("gender"),
-//						rs.getString("phone"), rs.getString("address"), rs.getString("disease"), rs.getString("date"));
-//				list.add(p);
-//			}
-//
-//		} catch (Exception e) {
-//			e.printStackTrace();
-//		}
-//
-//		return list;
-//	}
-	
-	
-	
-	public static List<Patient> searchPatients(String keyword) {
-
-	    List<Patient> list = new ArrayList<>();
-
-	    try {
-
-	        Connection con = DBConnection.connect();
-
-	        String sql = "SELECT * FROM patients WHERE "
-	                + "id LIKE ? OR "
-	                + "name LIKE ? OR "
-	                + "surname LIKE ? OR "
-	                + "phone LIKE ?";
+    // ================= COMMON MAPPER =================
+    private static Patient mapRow(ResultSet rs) throws SQLException {
+        return new Patient(
+                rs.getInt("id"),
+                rs.getString("name"),
+                rs.getInt("age"),
+                rs.getString("gender"),
+                rs.getString("phone"),
+                rs.getString("address"),
+                rs.getString("disease"),
+                rs.getString("date")
+        );
+    }
+
+    // ================= CREATE =================
+    public static boolean addPatient(Patient p) {
+
+        if (p.getName() == null || p.getName().trim().isEmpty()) {
+            return false;
+        }
+
+        String sql = "INSERT INTO patients(name, age, gender, phone, address, disease, date) VALUES(?,?,?,?,?,?,?)";
+
+        try (Connection conn = DBConnection.connect();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setString(1, p.getName());
+            ps.setInt(2, p.getAge());
+            ps.setString(3, p.getGender());
+            ps.setString(4, p.getPhone());
+            ps.setString(5, p.getAddress());
+            ps.setString(6, p.getDisease());
+            ps.setString(7, p.getDate());
+
+            ps.executeUpdate();
+            return true;
 
-	        PreparedStatement ps = con.prepareStatement(sql);
+        } catch (Exception e) {
+            System.err.println("Error adding patient: " + e.getMessage());
+            return false;
+        }
+    }
 
-	        ps.setString(1, "%" + keyword + "%");
-	        ps.setString(2, "%" + keyword + "%");
-	        ps.setString(3, "%" + keyword + "%");
-	        ps.setString(4, "%" + keyword + "%");
+    // ================= READ ALL =================
+    public static List<Patient> getAllPatients() {
 
-	        ResultSet rs = ps.executeQuery();
+        List<Patient> list = new ArrayList<>();
+        String sql = "SELECT * FROM patients";
 
-	        while (rs.next()) {
+        try (Connection conn = DBConnection.connect();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
 
-	            Patient p = new Patient(
-	                    rs.getInt("id"),
-	                    rs.getString("name"),
-	                    rs.getInt("age"),
-	                    rs.getString("gender"),
-	                    rs.getString("phone"),
-	                    rs.getString("address"),
-	                    rs.getString("disease"),
-	                    rs.getString("date")
-	                                       
-	            );
+            while (rs.next()) {
+                list.add(mapRow(rs));
+            }
 
-	            list.add(p);
-	        }
+        } catch (Exception e) {
+            System.err.println("Error fetching patients: " + e.getMessage());
+        }
 
-	        con.close();
+        return list;
+    }
 
-	    } catch (Exception e) {
-	        e.printStackTrace();
-	    }
+    // ================= DELETE =================
+    public static boolean deletePatient(int id) {
 
-	    return list;
-	}
-	public static boolean updatePatient(Patient p) {
+        String sql = "DELETE FROM patients WHERE id=?";
 
-		String sql = "UPDATE patients SET name=?, age=?, gender=?, phone=?, address=?, disease=? WHERE id=?";
+        try (Connection conn = DBConnection.connect();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
 
-		try (Connection conn = DBConnection.connect(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, id);
+            ps.executeUpdate();
+            return true;
 
-			ps.setString(1, p.getName());
-			ps.setInt(2, p.getAge());
-			ps.setString(3, p.getGender());
-			ps.setString(4, p.getPhone());
-			ps.setString(5, p.getAddress());
-			ps.setString(6, p.getDisease());
-			ps.setInt(7, p.getId());
+        } catch (Exception e) {
+            System.err.println("Error deleting patient: " + e.getMessage());
+            return false;
+        }
+    }
 
-			ps.executeUpdate();
-			return true;
+    // ================= UPDATE =================
+    public static boolean updatePatient(Patient p) {
 
-		} catch (Exception e) {
-			e.printStackTrace();
-			return false;
-		}
-	}
-	public static List<Patient> getPatientsSortedByDate() {
+        String sql = "UPDATE patients SET name=?, age=?, gender=?, phone=?, address=?, disease=? WHERE id=?";
 
-	    List<Patient> list = new ArrayList<>();
+        try (Connection conn = DBConnection.connect();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
 
-	    try {
+            ps.setString(1, p.getName());
+            ps.setInt(2, p.getAge());
+            ps.setString(3, p.getGender());
+            ps.setString(4, p.getPhone());
+            ps.setString(5, p.getAddress());
+            ps.setString(6, p.getDisease());
+            ps.setInt(7, p.getId());
 
-	        Connection con = dhule_Hospital_database.DBConnection.connect();
+            ps.executeUpdate();
+            return true;
 
-	        String sql = "SELECT * FROM patients ORDER BY date DESC";
+        } catch (Exception e) {
+            System.err.println("Error updating patient: " + e.getMessage());
+            return false;
+        }
+    }
 
-	        Statement st = con.createStatement();
-	        ResultSet rs = st.executeQuery(sql);
+    // ================= FIND BY ID =================
+    public static Patient getPatientById(int id) {
 
-	        while (rs.next()) {
+        String sql = "SELECT * FROM patients WHERE id = ?";
 
-	            Patient p = new Patient(
-	                    rs.getString("name"),
-	                    rs.getInt("age"),
-	                    rs.getString("gender"),
-	                    rs.getString("phone"),
-	                    rs.getString("address"),
-	                    rs.getString("disease"),
-	                    rs.getString("date")
-	            );
+        try (Connection con = DBConnection.connect();
+             PreparedStatement ps = con.prepareStatement(sql)) {
 
-	            p.setId(rs.getInt("id"));
+            ps.setInt(1, id);
+            ResultSet rs = ps.executeQuery();
 
-	            list.add(p);
-	        }
+            if (rs.next()) {
+                return mapRow(rs);
+            }
 
-	        con.close();
+        } catch (Exception e) {
+            System.err.println("Error fetching patient by ID: " + e.getMessage());
+        }
 
-	    } catch (Exception e) {
-	        e.printStackTrace();
-	    }
+        return null;
+    }
 
-	    return list;
-	}
-	
-	
-	public static Patient getPatientById(int id) {
+    // ================= SEARCH =================
+    public static List<Patient> searchPatients(String keyword) {
 
-	    Patient patient = null;
+        List<Patient> list = new ArrayList<>();
 
-	    try {
+        String sql = "SELECT * FROM patients WHERE name LIKE ? OR surname LIKE ? OR phone LIKE ?";
 
-	        Connection con = DBConnection.connect();
+        try (Connection con = DBConnection.connect();
+             PreparedStatement ps = con.prepareStatement(sql)) {
 
-	        String sql = "SELECT * FROM patients WHERE id = ?";
+            String pattern = "%" + keyword + "%";
 
-	        PreparedStatement ps = con.prepareStatement(sql);
-	        ps.setInt(1, id);
+            ps.setString(1, pattern);
+            ps.setString(2, pattern);
+            ps.setString(3, pattern);
 
-	        ResultSet rs = ps.executeQuery();
+            ResultSet rs = ps.executeQuery();
 
-	        if (rs.next()) {
+            while (rs.next()) {
+                list.add(mapRow(rs));
+            }
 
-	            patient = new Patient(
-	                    rs.getInt("id"),
-	                    rs.getString("name"),
-	                    rs.getInt("age"),
-	                    rs.getString("gender"),
-	                    rs.getString("phone"),
-	                    rs.getString("address"),
-	                    rs.getString("disease"),
-	                    rs.getString("date")
-	            );
-	        }
+        } catch (Exception e) {
+            System.err.println("Error searching patients: " + e.getMessage());
+        }
 
-	        con.close();
+        return list;
+    }
 
-	    } catch (Exception e) {
-	        e.printStackTrace();
-	    }
+    // ================= SORT (GENERIC) =================
+    public static List<Patient> getPatientsSorted(String column) {
 
-	    return patient;
-	}
-	public static List<Patient> getPatientsSortedByAge() {
+        List<Patient> list = new ArrayList<>();
 
-	    List<Patient> list = new ArrayList<>();
+        String sql = "SELECT * FROM patients ORDER BY " + column + " DESC";
 
-	    try {
+        try (Connection con = DBConnection.connect();
+             Statement st = con.createStatement();
+             ResultSet rs = st.executeQuery(sql)) {
 
-	        Connection con = dhule_Hospital_database.DBConnection.connect();
+            while (rs.next()) {
+                list.add(mapRow(rs));
+            }
 
-	        String sql = "SELECT * FROM patients ORDER BY age DESC";
+        } catch (Exception e) {
+            System.err.println("Error sorting patients: " + e.getMessage());
+        }
 
-	        Statement st = con.createStatement();
-	        ResultSet rs = st.executeQuery(sql);
+        return list;
+    }
 
-	        while (rs.next()) {
+    // ================= TODAY PATIENTS =================
+    public static List<Patient> getTodayPatients() {
 
-	            Patient p = new Patient(
-	                    rs.getString("name"),
-	                    rs.getInt("age"),
-	                    rs.getString("gender"),
-	                    rs.getString("phone"),
-	                    rs.getString("address"),
-	                    rs.getString("disease"),
-	                    rs.getString("date")
-	            );
+        List<Patient> list = new ArrayList<>();
+        String today = java.time.LocalDate.now().toString();
 
-	            p.setId(rs.getInt("id"));
+        String sql = "SELECT * FROM patients WHERE date = ?";
 
-	            list.add(p);
-	        }
+        try (Connection con = DBConnection.connect();
+             PreparedStatement ps = con.prepareStatement(sql)) {
 
-	        con.close();
+            ps.setString(1, today);
+            ResultSet rs = ps.executeQuery();
 
-	    } catch (Exception e) {
-	        e.printStackTrace();
-	    }
+            while (rs.next()) {
+                list.add(mapRow(rs));
+            }
 
-	    return list;
-	}
-	public static List<Patient> getTodayPatients() {
+        } catch (Exception e) {
+            System.err.println("Error fetching today's patients: " + e.getMessage());
+        }
 
-	    List<Patient> list = new ArrayList<>();
+        return list;
+    }
 
-	    try {
+    // ================= DATE RANGE =================
+    public static List<Patient> getPatientsByDateRange(String fromDate, String toDate) {
 
-	        Connection con = dhule_Hospital_database.DBConnection.connect();
+        List<Patient> list = new ArrayList<>();
 
-	        String today = java.time.LocalDate.now().toString();
+        String sql = "SELECT * FROM patients WHERE date BETWEEN ? AND ? ORDER BY date DESC";
 
-	        String sql = "SELECT * FROM patients WHERE date = ?";
+        try (Connection con = DBConnection.connect();
+             PreparedStatement ps = con.prepareStatement(sql)) {
 
-	        PreparedStatement ps = con.prepareStatement(sql);
-	        ps.setString(1, today);
+            ps.setString(1, fromDate);
+            ps.setString(2, toDate);
 
-	        ResultSet rs = ps.executeQuery();
+            ResultSet rs = ps.executeQuery();
 
-	        while (rs.next()) {
+            while (rs.next()) {
+                list.add(mapRow(rs));
+            }
 
-	            Patient p = new Patient(
-	                    rs.getString("name"),
-	                    rs.getInt("age"),
-	                    rs.getString("gender"),
-	                    rs.getString("phone"),
-	                    rs.getString("address"),
-	                    rs.getString("disease"),
-	                    rs.getString("date")
-	            );
+        } catch (Exception e) {
+            System.err.println("Error fetching patients by date range: " + e.getMessage());
+        }
 
-	            p.setId(rs.getInt("id"));
-
-	            list.add(p);
-	        }
-
-	        con.close();
-
-	    } catch (Exception e) {
-	        e.printStackTrace();
-	    }
-
-	    return list;
-	}
-	public static List<Patient> getPatientsByDateRange(String fromDate, String toDate) {
-
-	    List<Patient> list = new ArrayList<>();
-
-	    try {
-
-	        Connection con = DBConnection.connect();
-
-	        String sql = "SELECT * FROM patients WHERE date BETWEEN ? AND ? ORDER BY date DESC";
-
-	        PreparedStatement ps = con.prepareStatement(sql);
-	        ps.setString(1, fromDate);
-	        ps.setString(2, toDate);
-
-	        ResultSet rs = ps.executeQuery();
-
-	        while (rs.next()) {
-
-	            Patient p = new Patient(
-	                    rs.getInt("id"),
-	                    rs.getString("name"),
-	                    rs.getInt("age"),
-	                    rs.getString("gender"),
-	                    rs.getString("phone"),
-	                    rs.getString("address"),
-	                    rs.getString("disease"),
-	                    rs.getString("date")
-	            );
-
-	            list.add(p);
-	        }
-
-	        con.close();
-
-	    } catch (Exception e) {
-	        e.printStackTrace();
-	    }
-
-	    return list;
-	}
-	public static List<Patient> getPatientsSortedByName() {
-
-	    List<Patient> list = new ArrayList<>();
-
-	    try {
-
-	        Connection con = DBConnection.connect();
-
-	        String sql = "SELECT * FROM patients ORDER BY name ASC";
-
-	        Statement st = con.createStatement();
-	        ResultSet rs = st.executeQuery(sql);
-
-	        while (rs.next()) {
-
-	            Patient p = new Patient(
-	                    rs.getInt("id"),
-	                    rs.getString("name"),
-	                    rs.getInt("age"),
-	                    rs.getString("gender"),
-	                    rs.getString("phone"),
-	                    rs.getString("address"),
-	                    rs.getString("disease"),
-	                    rs.getString("date")
-	            );
-
-	            list.add(p);
-	        }
-
-	        con.close();
-
-	    } catch (Exception e) {
-	        e.printStackTrace();
-	    }
-
-	    return list;
-	}
+        return list;
+    }
 }

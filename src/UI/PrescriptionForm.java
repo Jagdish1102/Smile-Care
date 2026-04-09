@@ -10,17 +10,22 @@ import java.awt.print.*;
 import java.sql.*;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.UUID;
 
 public class PrescriptionForm extends JFrame {
 
-    private JComboBox<String> patientBox;
+    // UI Components
+    JComboBox<String> patientBox;
     private JLabel patientAgeLabel;
     private JLabel patientGenderLabel;
     private JTextField patientWeightField;
 
+    // Drug Master Components
+    private JComboBox<String> drugMasterBox;
     private JComboBox<String> medicineBox;
     private JComboBox<String> instructionBox;
-
+    private JComboBox<String> instructionMarathiBox;
+    
     private JSpinner quantitySpinner;
     private JPanel mainPanel;
     private JTextField daysField;
@@ -31,407 +36,380 @@ public class PrescriptionForm extends JFrame {
     private JTextArea prescriptionArea;
     private JTextArea adviceArea;
 
-    private JLabel dateLabel;
-    private JLabel registrationNoLabel;
+    // Mode Selection
+    private JComboBox<String> modeCombo;
+    private JPanel drugMasterPanel;
+    private JPanel customMedicinePanel;
+    
+    private String currentPrescriptionId;
+    private JLabel prescriptionIdLabel;
     
     // Professional color scheme
-    private final Color PRIMARY_COLOR = new Color(0, 102, 204);
-    private final Color SECONDARY_COLOR = new Color(0, 153, 76);
-    private final Color BORDER_COLOR = new Color(220, 220, 220);
-    private final Color HEADER_COLOR = new Color(0, 51, 102);
+    private final Color SKY_BLUE = new Color(0, 150, 214);
+    private final Color SKY_BLUE_DARK = new Color(0, 120, 180);
+    private final Color SKY_BLUE_LIGHT = new Color(200, 230, 250);
+    private final Color BORDER_COLOR = new Color(200, 200, 200);
+    private final Color HEADER_COLOR = new Color(0, 80, 120);
+    private final Color TEXT_COLOR = new Color(50, 50, 50);
     
     // Doctor information
     private final String DOCTOR_NAME = "Dr. Amit Jain";
-    private final String DOCTOR_QUALIFICATION = "MBBS, MD (Medicine)";
-    private final String REGISTRATION_NO = "MH-12345";
+    private final String HOSPITAL_NAME = "SMILE CARE DENTAL CLINIC";
+    
+    // Bilingual Instructions
+    private final String[][] INSTRUCTIONS = {
+        {"After Food", "जेवणानंतर"},
+        {"Before Food", "जेवणाआधी"},
+        {"Empty Stomach", "पोट रिकामे असताना"},
+        {"Before Sleep", "झोपण्यापूर्वी"},
+        {"With Warm Water", "कोमट पाण्यासोबत"},
+        {"With Milk", "दुधासोबत"},
+        {"Twice Daily", "दिवसातून दोन वेळा"},
+        {"Thrice Daily", "दिवसातून तीन वेळा"},
+        {"Once Daily", "दिवसातून एक वेळ"}
+    };
 
     public PrescriptionForm() {
+        generatePrescriptionId();
         initializeUI();
-        setupListeners();
+        setupOptimizedListeners();
         loadPatients();
+        loadDrugMaster();
         loadMedicines();
         setVisible(true);
     }
 
+    private void generatePrescriptionId() {
+        currentPrescriptionId = "RX-" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")) + 
+                               "-" + String.format("%04d", (int)(Math.random() * 10000));
+    }
+
     private void initializeUI() {
-        setTitle("City Hospital - Electronic Prescription System");
-        setExtendedState(JFrame.MAXIMIZED_BOTH);
+        setTitle("Smile Care - Prescription System");
+        setSize(1300, 800);
+        setMinimumSize(new Dimension(1200, 750));
+        setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         
-        // Main container with scroll
-        JScrollPane mainScrollPane = new JScrollPane();
-        mainScrollPane.setBorder(null);
-        mainScrollPane.getViewport().setBackground(new Color(240, 248, 255));
-        mainScrollPane.getVerticalScrollBar().setUnitIncrement(16);
-        
-        // Main content panel
-        mainPanel = new JPanel();
-        mainPanel.setLayout(new BoxLayout(mainPanel, BoxLayout.Y_AXIS));
+        mainPanel = new JPanel(new GridBagLayout());
         mainPanel.setBackground(Color.WHITE);
-        mainPanel.setBorder(BorderFactory.createEmptyBorder(20, 30, 20, 30));
+        mainPanel.setBorder(BorderFactory.createEmptyBorder(15, 20, 15, 20));
         
-        mainScrollPane.setViewportView(mainPanel);
-        add(mainScrollPane, BorderLayout.CENTER);
+        JScrollPane scrollPane = new JScrollPane(mainPanel);
+        scrollPane.setBorder(null);
+        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+        add(scrollPane, BorderLayout.CENTER);
 
-        // Create all sections
-        createHeaderSection();
-        createPatientInfoSection();
-        createMedicineEntrySection();
-        createPrescriptionSection();
-        createAdviceAndSignatureSection();
-        createButtonSection();
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(8, 10, 8, 10);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.anchor = GridBagConstraints.WEST;
+        
+        int row = 0;
+        
+        // Header Section
+        gbc.gridx = 0; gbc.gridy = row; gbc.gridwidth = 2;
+        addHeaderSection(gbc);
+        row++;
+        
+        // Prescription ID Display
+        gbc.gridx = 0; gbc.gridy = row; gbc.gridwidth = 2;
+        addPrescriptionIdSection(gbc);
+        row++;
+        
+        // Patient Info
+        gbc.gridx = 0; gbc.gridy = row; gbc.gridwidth = 2;
+        addPatientInfoSection(gbc);
+        row++;
+        
+        // Mode Selection (Add Prescription / Add Medicine)
+        gbc.gridx = 0; gbc.gridy = row; gbc.gridwidth = 2;
+        addModeSelectionSection(gbc);
+        row++;
+        
+        // Drug Master Panel (Quick Prescription)
+        gbc.gridx = 0; gbc.gridy = row; gbc.gridwidth = 2;
+        drugMasterPanel = addDrugMasterSection(gbc);
+        row++;
+        
+        // Custom Medicine Panel
+        gbc.gridx = 0; gbc.gridy = row; gbc.gridwidth = 2;
+        customMedicinePanel = addCustomMedicineSection(gbc);
+        row++;
+        
+        // Prescription Display Area
+        gbc.gridx = 0; gbc.gridy = row; gbc.gridwidth = 2;
+        addPrescriptionDisplaySection(gbc);
+        row++;
+        
+        // Action Buttons
+        gbc.gridx = 0; gbc.gridy = row; gbc.gridwidth = 2;
+        addButtonSection(gbc);
+        
+        // Show custom medicine panel by default, hide drug master
+        drugMasterPanel.setVisible(false);
     }
 
-    private void createHeaderSection() {
-        // Hospital header
+    private void addHeaderSection(GridBagConstraints gbc) {
         JPanel headerPanel = new JPanel(new BorderLayout());
         headerPanel.setBackground(Color.WHITE);
-        headerPanel.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createMatteBorder(0, 0, 2, 0, PRIMARY_COLOR),
-            BorderFactory.createEmptyBorder(15, 20, 15, 20)
-        ));
+        headerPanel.setBorder(BorderFactory.createMatteBorder(0, 0, 2, 0, SKY_BLUE));
         
-        // Left side - Hospital info
-        JPanel leftPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
-        leftPanel.setBackground(Color.WHITE);
+        JLabel title = new JLabel(HOSPITAL_NAME);
+        title.setFont(new Font("Segoe UI", Font.BOLD, 24));
+        title.setForeground(HEADER_COLOR);
+        title.setHorizontalAlignment(SwingConstants.CENTER);
+        headerPanel.add(title, BorderLayout.CENTER);
         
-        JLabel logoLabel = new JLabel("🏥");
-        logoLabel.setFont(new Font("Segoe UI", Font.PLAIN, 48));
-        leftPanel.add(logoLabel);
-        
-        JPanel titlePanel = new JPanel(new GridLayout(2, 1));
-        titlePanel.setBackground(Color.WHITE);
-        JLabel hospitalName = new JLabel("CITY HOSPITAL & RESEARCH CENTER");
-        hospitalName.setFont(new Font("Segoe UI", Font.BOLD, 22));
-        hospitalName.setForeground(HEADER_COLOR);
-        titlePanel.add(hospitalName);
-        
-        JLabel tagline = new JLabel("Quality Healthcare Services Since 1995");
-        tagline.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-        tagline.setForeground(Color.GRAY);
-        titlePanel.add(tagline);
-        
-        leftPanel.add(titlePanel);
-        headerPanel.add(leftPanel, BorderLayout.WEST);
-        
-        // Right side - Doctor info and date
-        JPanel rightPanel = new JPanel(new GridLayout(3, 1, 5, 2));
-        rightPanel.setBackground(Color.WHITE);
-        rightPanel.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 0));
-        
-        JLabel doctorLabel = new JLabel(DOCTOR_NAME + " | " + DOCTOR_QUALIFICATION);
-        doctorLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
-        doctorLabel.setForeground(PRIMARY_COLOR);
-        rightPanel.add(doctorLabel);
-        
-        LocalDate currentDate = LocalDate.now();
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
-        JLabel dateLabel2 = new JLabel("Date: " + currentDate.format(formatter));
-        dateLabel2.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-        rightPanel.add(dateLabel2);
-        
-        JLabel regLabel = new JLabel("Reg. No: " + REGISTRATION_NO);
-        regLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-        rightPanel.add(regLabel);
-        
-        headerPanel.add(rightPanel, BorderLayout.EAST);
-        
-        mainPanel.add(headerPanel);
-        mainPanel.add(Box.createRigidArea(new Dimension(0, 15)));
+        mainPanel.add(headerPanel, gbc);
     }
 
-    private void createPatientInfoSection() {
+    private void addPrescriptionIdSection(GridBagConstraints gbc) {
+        JPanel idPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        idPanel.setBackground(Color.WHITE);
+        
+        JLabel idLabel = new JLabel("Prescription ID: ");
+        idLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        
+        prescriptionIdLabel = new JLabel(currentPrescriptionId);
+        prescriptionIdLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        prescriptionIdLabel.setForeground(SKY_BLUE);
+        
+        JLabel dateLabel = new JLabel("Date: " + LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+        dateLabel.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        dateLabel.setForeground(Color.GRAY);
+        
+        idPanel.add(idLabel);
+        idPanel.add(prescriptionIdLabel);
+        idPanel.add(Box.createHorizontalStrut(20));
+        idPanel.add(dateLabel);
+        
+        mainPanel.add(idPanel, gbc);
+    }
+
+    private void addPatientInfoSection(GridBagConstraints gbc) {
         JPanel patientPanel = new JPanel(new GridBagLayout());
-        patientPanel.setBackground(new Color(250, 250, 255));
+        patientPanel.setBackground(SKY_BLUE_LIGHT);
         patientPanel.setBorder(BorderFactory.createTitledBorder(
-            BorderFactory.createLineBorder(PRIMARY_COLOR), 
-            "Patient Information",
-            TitledBorder.LEFT,
-            TitledBorder.TOP,
-            new Font("Segoe UI", Font.BOLD, 13),
-            PRIMARY_COLOR
+            BorderFactory.createLineBorder(SKY_BLUE), "Patient Information",
+            TitledBorder.LEFT, TitledBorder.TOP, new Font("Segoe UI", Font.BOLD, 14), SKY_BLUE
         ));
         
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(8, 8, 8, 8);
-        gbc.fill = GridBagConstraints.HORIZONTAL;
+        GridBagConstraints pgbc = new GridBagConstraints();
+        pgbc.insets = new Insets(5, 5, 5, 5);
+        pgbc.fill = GridBagConstraints.HORIZONTAL;
+        
+        pgbc.gridx = 0; pgbc.gridy = 0;
+        patientPanel.add(createBoldLabel("Patient:"), pgbc);
+        pgbc.gridx = 1;
+        patientBox = createStyledComboBox();
+        patientBox.setPreferredSize(new Dimension(200, 35));
+        patientPanel.add(patientBox, pgbc);
+        
+        pgbc.gridx = 2;
+        patientPanel.add(createBoldLabel("Age:"), pgbc);
+        pgbc.gridx = 3;
+        patientAgeLabel = createValueLabel("-");
+        patientPanel.add(patientAgeLabel, pgbc);
+        
+        pgbc.gridx = 4;
+        patientPanel.add(createBoldLabel("Gender:"), pgbc);
+        pgbc.gridx = 5;
+        patientGenderLabel = createValueLabel("-");
+        patientPanel.add(patientGenderLabel, pgbc);
+        
+        pgbc.gridx = 6;
+        patientPanel.add(createBoldLabel("Weight (kg):"), pgbc);
+        pgbc.gridx = 7;
+        patientWeightField = createStyledTextField(5);
+        patientWeightField.setPreferredSize(new Dimension(80, 35));
+        patientPanel.add(patientWeightField, pgbc);
+        
+        mainPanel.add(patientPanel, gbc);
+    }
+
+    private void addModeSelectionSection(GridBagConstraints gbc) {
+        JPanel modePanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 5));
+        modePanel.setBackground(Color.WHITE);
+        
+        modePanel.add(createBoldLabel("Mode:"));
+        
+        modeCombo = new JComboBox<>(new String[]{" Add Medicine (Custom)", " Add Prescription (Quick)"});
+        modeCombo.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        modeCombo.setPreferredSize(new Dimension(250, 35));
+        modeCombo.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        modeCombo.addActionListener(e -> {
+            boolean isDrugMaster = modeCombo.getSelectedIndex() == 1;
+            drugMasterPanel.setVisible(isDrugMaster);
+            customMedicinePanel.setVisible(!isDrugMaster);
+            mainPanel.revalidate();
+            mainPanel.repaint();
+        });
+        modePanel.add(modeCombo);
+        
+        mainPanel.add(modePanel, gbc);
+    }
+
+    private JPanel addDrugMasterSection(GridBagConstraints gbc) {
+        JPanel panel = new JPanel(new GridBagLayout());
+        panel.setBackground(new Color(255, 255, 245));
+        panel.setBorder(BorderFactory.createTitledBorder(
+            BorderFactory.createLineBorder(SKY_BLUE), "Quick Prescription (Drug Master)",
+            TitledBorder.LEFT, TitledBorder.TOP, new Font("Segoe UI", Font.BOLD, 14), SKY_BLUE
+        ));
+        
+        GridBagConstraints dgbc = new GridBagConstraints();
+        dgbc.insets = new Insets(5, 5, 5, 5);
+        dgbc.fill = GridBagConstraints.HORIZONTAL;
+        
+        dgbc.gridx = 0; dgbc.gridy = 0;
+        panel.add(createBoldLabel("Select Prescription:"), dgbc);
+        dgbc.gridx = 1; dgbc.gridwidth = 3;
+        drugMasterBox = createStyledComboBox();
+        drugMasterBox.setPreferredSize(new Dimension(300, 35));
+        panel.add(drugMasterBox, dgbc);
+        
+        dgbc.gridx = 0; dgbc.gridy = 1; dgbc.gridwidth = 1;
+        JButton addPrescriptionBtn = createSkyBlueButton(" Add Prescription", true);
+        addPrescriptionBtn.addActionListener(e -> addDrugMasterPrescription());
+        panel.add(addPrescriptionBtn, dgbc);
+        
+        mainPanel.add(panel, gbc);
+        return panel;
+    }
+
+    private JPanel addCustomMedicineSection(GridBagConstraints gbc) {
+        JPanel panel = new JPanel(new GridBagLayout());
+        panel.setBackground(new Color(255, 255, 248));
+        panel.setBorder(BorderFactory.createTitledBorder(
+            BorderFactory.createLineBorder(SKY_BLUE), "Add Medicine",
+            TitledBorder.LEFT, TitledBorder.TOP, new Font("Segoe UI", Font.BOLD, 14), SKY_BLUE
+        ));
+        
+        GridBagConstraints mgbc = new GridBagConstraints();
+        mgbc.insets = new Insets(5, 5, 5, 5);
+        mgbc.fill = GridBagConstraints.HORIZONTAL;
         
         // Row 1
-        gbc.gridx = 0;
-        gbc.gridy = 0;
-        gbc.weightx = 0.1;
-        patientPanel.add(new JLabel("Patient Name:"), gbc);
+        mgbc.gridx = 0; mgbc.gridy = 0;
+        panel.add(createBoldLabel("Medicine:"), mgbc);
+        mgbc.gridx = 1;
+        medicineBox = createStyledComboBox();
+        medicineBox.setPreferredSize(new Dimension(200, 35));
+        panel.add(medicineBox, mgbc);
         
-        gbc.gridx = 1;
-        gbc.weightx = 0.4;
-        patientBox = new JComboBox<>();
-        patientBox.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        patientBox.setPreferredSize(new Dimension(250, 32));
-        patientPanel.add(patientBox, gbc);
-        
-        gbc.gridx = 2;
-        gbc.weightx = 0.1;
-        patientPanel.add(new JLabel("Age:"), gbc);
-        
-        gbc.gridx = 3;
-        gbc.weightx = 0.1;
-        patientAgeLabel = new JLabel("-");
-        patientAgeLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        patientPanel.add(patientAgeLabel, gbc);
-        
-        gbc.gridx = 4;
-        gbc.weightx = 0.1;
-        patientPanel.add(new JLabel("Gender:"), gbc);
-        
-        gbc.gridx = 5;
-        gbc.weightx = 0.1;
-        patientGenderLabel = new JLabel("-");
-        patientGenderLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        patientPanel.add(patientGenderLabel, gbc);
-        
-        gbc.gridx = 6;
-        gbc.weightx = 0.1;
-        patientPanel.add(new JLabel("Weight (kg):"), gbc);
-        
-        gbc.gridx = 7;
-        gbc.weightx = 0.1;
-        patientWeightField = new JTextField(8);
-        patientWeightField.setPreferredSize(new Dimension(80, 32));
-        patientPanel.add(patientWeightField, gbc);
-        
-        mainPanel.add(patientPanel);
-        mainPanel.add(Box.createRigidArea(new Dimension(0, 15)));
-    }
-
-    private void createMedicineEntrySection() {
-        JPanel medPanel = new JPanel(new GridBagLayout());
-        medPanel.setBackground(new Color(255, 255, 245));
-        medPanel.setBorder(BorderFactory.createTitledBorder(
-            BorderFactory.createLineBorder(SECONDARY_COLOR),
-            "Add Prescription",
-            TitledBorder.LEFT,
-            TitledBorder.TOP,
-            new Font("Segoe UI", Font.BOLD, 13),
-            SECONDARY_COLOR
-        ));
-        
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(8, 8, 8, 8);
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        
-        // Row 1 - Medicine, Qty, Days
-        gbc.gridx = 0;
-        gbc.gridy = 0;
-        gbc.weightx = 0.1;
-        medPanel.add(new JLabel("Medicine:"), gbc);
-        
-        gbc.gridx = 1;
-        gbc.weightx = 0.3;
-        medicineBox = new JComboBox<>();
-        medicineBox.setPreferredSize(new Dimension(180, 32));
-        medPanel.add(medicineBox, gbc);
-        
-        gbc.gridx = 2;
-        gbc.weightx = 0.05;
-        medPanel.add(new JLabel("Qty:"), gbc);
-        
-        gbc.gridx = 3;
-        gbc.weightx = 0.1;
+        mgbc.gridx = 2;
+        panel.add(createBoldLabel("Qty:"), mgbc);
+        mgbc.gridx = 3;
         quantitySpinner = new JSpinner(new SpinnerNumberModel(1, 1, 100, 1));
-        quantitySpinner.setPreferredSize(new Dimension(60, 32));
-        medPanel.add(quantitySpinner, gbc);
+        quantitySpinner.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        quantitySpinner.setPreferredSize(new Dimension(70, 35));
+        panel.add(quantitySpinner, mgbc);
         
-        gbc.gridx = 4;
-        gbc.weightx = 0.05;
-        medPanel.add(new JLabel("Days:"), gbc);
-        
-        gbc.gridx = 5;
-        gbc.weightx = 0.1;
-        daysField = new JTextField("5", 3);
-        daysField.setPreferredSize(new Dimension(50, 32));
-        medPanel.add(daysField, gbc);
+        mgbc.gridx = 4;
+        panel.add(createBoldLabel("Days:"), mgbc);
+        mgbc.gridx = 5;
+        daysField = createStyledTextField(3);
+        daysField.setText("5");
+        daysField.setPreferredSize(new Dimension(60, 35));
+        panel.add(daysField, mgbc);
         
         // Row 2 - Dosage
-   
-        gbc.gridx = 0;
-        gbc.gridy = 1;
-        gbc.weightx = 0.1;
-        medPanel.add(new JLabel("Dosage:"), gbc);
-
-        // Morning
-        gbc.gridx = 1;
-        gbc.weightx = 0.1;
-        morningDoseField = new JTextField("1", 2);
-        morningDoseField.setPreferredSize(new Dimension(45, 32));
+        mgbc.gridx = 0; mgbc.gridy = 1;
+        panel.add(createBoldLabel("Dosage:"), mgbc);
+        
+        mgbc.gridx = 1;
+        morningDoseField = createStyledTextField(2);
+        morningDoseField.setText("1");
         morningDoseField.setHorizontalAlignment(JTextField.CENTER);
-        limitText(morningDoseField, 1);
-        medPanel.add(morningDoseField, gbc);
-
-        gbc.gridx = 2;
-        gbc.weightx = 0.05;
-        medPanel.add(new JLabel("M"), gbc);
-
-        // Afternoon
-        gbc.gridx = 3;
-        gbc.weightx = 0.1;
-        afternoonDoseField = new JTextField("1", 2);
-        afternoonDoseField.setPreferredSize(new Dimension(45, 32));
+        morningDoseField.setPreferredSize(new Dimension(50, 35));
+        panel.add(morningDoseField, mgbc);
+        mgbc.gridx = 2;
+        panel.add(new JLabel("M"), mgbc);
+        
+        mgbc.gridx = 3;
+        afternoonDoseField = createStyledTextField(2);
+        afternoonDoseField.setText("1");
         afternoonDoseField.setHorizontalAlignment(JTextField.CENTER);
-        limitText(afternoonDoseField, 1);
-        medPanel.add(afternoonDoseField, gbc);
-
-        gbc.gridx = 4;
-        gbc.weightx = 0.05;
-        medPanel.add(new JLabel("A"), gbc);
-
-        // Evening
-        gbc.gridx = 5;
-        gbc.weightx = 0.1;
-        eveningDoseField = new JTextField("1", 2);
-        eveningDoseField.setPreferredSize(new Dimension(45, 32));
+        afternoonDoseField.setPreferredSize(new Dimension(50, 35));
+        panel.add(afternoonDoseField, mgbc);
+        mgbc.gridx = 4;
+        panel.add(new JLabel("A"), mgbc);
+        
+        mgbc.gridx = 5;
+        eveningDoseField = createStyledTextField(2);
+        eveningDoseField.setText("1");
         eveningDoseField.setHorizontalAlignment(JTextField.CENTER);
-        limitText(eveningDoseField, 1);
-        medPanel.add(eveningDoseField, gbc);
-
-        gbc.gridx = 6;
-        gbc.weightx = 0.05;
-        medPanel.add(new JLabel("E"), gbc);
+        eveningDoseField.setPreferredSize(new Dimension(50, 35));
+        panel.add(eveningDoseField, mgbc);
+        mgbc.gridx = 6;
+        panel.add(new JLabel("E"), mgbc);
         
-        // Row 3 - Instruction and Add Button
-        gbc.gridx = 0;
-        gbc.gridy = 2;
-        gbc.weightx = 0.1;
-        medPanel.add(new JLabel("Instruction:"), gbc);
+        // Row 3 - Bilingual Instructions
+        mgbc.gridx = 0; mgbc.gridy = 2;
+        panel.add(createBoldLabel("Instruction:"), mgbc);
+        mgbc.gridx = 1; mgbc.gridwidth = 2;
+        instructionBox = createStyledComboBox();
+        instructionBox.setPreferredSize(new Dimension(200, 35));
+        panel.add(instructionBox, mgbc);
         
-        gbc.gridx = 1;
-        gbc.gridwidth = 4;
-        gbc.weightx = 0.5;
-        instructionBox = new JComboBox<>(new String[]{
-            "After Food", "Before Food", "Empty Stomach", "Before Sleep", "With Warm Water", "With Milk", "A Spoon", "Half Spoon"
-        });
-        instructionBox.setPreferredSize(new Dimension(200, 32));
-        medPanel.add(instructionBox, gbc);
+        mgbc.gridx = 3; mgbc.gridwidth = 2;
+        instructionMarathiBox = createStyledComboBox();
+        instructionMarathiBox.setPreferredSize(new Dimension(200, 35));
+        panel.add(instructionMarathiBox, mgbc);
         
-        gbc.gridx = 5;
-        gbc.gridwidth = 1;
-        gbc.weightx = 0.2;
-        JButton addBtn = new JButton("➕ Add Medicine");
-        addBtn.setBackground(SECONDARY_COLOR);
-        addBtn.setForeground(Color.WHITE);
-        addBtn.setFocusPainted(false);
-        addBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        addBtn.addActionListener(e -> addMedicine());
-        medPanel.add(addBtn, gbc);
-
-        // Press ENTER = Add Medicine
-        getRootPane().setDefaultButton(addBtn);
+        // Populate instructions
+        for (String[] inst : INSTRUCTIONS) {
+            instructionBox.addItem(inst[0]);
+            instructionMarathiBox.addItem(inst[1]);
+        }
         
-        mainPanel.add(medPanel);
-        mainPanel.add(Box.createRigidArea(new Dimension(0, 15)));
+        mgbc.gridx = 5; mgbc.gridwidth = 1;
+        JButton addBtn = createSkyBlueButton("➕ Add Medicine", true);
+        addBtn.addActionListener(e -> addCustomMedicine());
+        panel.add(addBtn, mgbc);
+        
+        mainPanel.add(panel, gbc);
+        return panel;
     }
 
-    private void createPrescriptionSection() {
-        JPanel rxPanel = new JPanel(new BorderLayout(10, 5));
+    private void addPrescriptionDisplaySection(GridBagConstraints gbc) {
+        JPanel rxPanel = new JPanel(new BorderLayout(5, 5));
         rxPanel.setBackground(Color.WHITE);
         rxPanel.setBorder(BorderFactory.createTitledBorder(
-            BorderFactory.createLineBorder(BORDER_COLOR),
-            "Prescription",
-            TitledBorder.LEFT,
-            TitledBorder.TOP,
-            new Font("Segoe UI", Font.BOLD, 13),
-            PRIMARY_COLOR
+            BorderFactory.createLineBorder(SKY_BLUE), "Prescription",
+            TitledBorder.LEFT, TitledBorder.TOP, new Font("Segoe UI", Font.BOLD, 14), SKY_BLUE
         ));
         
-        // Left side with Rx symbol
-        JPanel leftRxPanel = new JPanel();
-        leftRxPanel.setBackground(Color.WHITE);
-        JLabel rxLabel = new JLabel("Rx");
-        rxLabel.setFont(new Font("Arial", Font.BOLD | Font.ITALIC, 32));
-        rxLabel.setForeground(new Color(180, 0, 0));
-        leftRxPanel.add(rxLabel);
-        rxPanel.add(leftRxPanel, BorderLayout.WEST);
-        
-        // Prescription text area
-        prescriptionArea = new JTextArea(8, 50);
-        prescriptionArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
+        prescriptionArea = new JTextArea(10, 60);
+        prescriptionArea.setFont(new Font("Monospaced", Font.PLAIN, 14));
         prescriptionArea.setMargin(new Insets(10, 10, 10, 10));
-        prescriptionArea.setBackground(new Color(255, 255, 240));
+        prescriptionArea.setBackground(new Color(255, 255, 245));
+        prescriptionArea.setEditable(false);
+        
         JScrollPane sp = new JScrollPane(prescriptionArea);
-        sp.setBorder(BorderFactory.createLineBorder(BORDER_COLOR));
+        sp.setPreferredSize(new Dimension(0, 200));
         rxPanel.add(sp, BorderLayout.CENTER);
         
-        mainPanel.add(rxPanel);
-        mainPanel.add(Box.createRigidArea(new Dimension(0, 15)));
+        mainPanel.add(rxPanel, gbc);
     }
 
-    private void createAdviceAndSignatureSection() {
-        // Advice section
-        JPanel advicePanel = new JPanel(new BorderLayout());
-        advicePanel.setBackground(Color.WHITE);
-        advicePanel.setBorder(BorderFactory.createTitledBorder(
-            BorderFactory.createLineBorder(BORDER_COLOR),
-            "Advice & Instructions",
-            TitledBorder.LEFT,
-            TitledBorder.TOP,
-            new Font("Segoe UI", Font.BOLD, 13),
-            PRIMARY_COLOR
-        ));
-        
-        adviceArea = new JTextArea(3, 50);
-        adviceArea.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        adviceArea.setMargin(new Insets(8, 8, 8, 8));
-        adviceArea.setLineWrap(true);
-        adviceArea.setWrapStyleWord(true);
-        JScrollPane adviceScroll = new JScrollPane(adviceArea);
-        adviceScroll.setBorder(BorderFactory.createLineBorder(BORDER_COLOR));
-        advicePanel.add(adviceScroll, BorderLayout.CENTER);
-        
-        mainPanel.add(advicePanel);
-        mainPanel.add(Box.createRigidArea(new Dimension(0, 15)));
-        
-        // Signature section
-        JPanel signaturePanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        signaturePanel.setBackground(Color.WHITE);
-        signaturePanel.setBorder(BorderFactory.createEmptyBorder(5, 0, 10, 0));
-        
-        JPanel signInner = new JPanel(new GridLayout(3, 1, 0, 2));
-        signInner.setBackground(Color.WHITE);
-        
-        JLabel signLabel = new JLabel("Doctor's Signature:");
-        signLabel.setFont(new Font("Segoe UI", Font.BOLD, 11));
-        signInner.add(signLabel);
-        
-        JLabel signLine = new JLabel("_________________________");
-        signLine.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        signInner.add(signLine);
-        
-        JLabel signName = new JLabel(DOCTOR_NAME);
-        signName.setFont(new Font("Segoe UI", Font.BOLD, 11));
-        signInner.add(signName);
-        
-        signaturePanel.add(signInner);
-        mainPanel.add(signaturePanel);
-    }
-
-    private void createButtonSection() {
+    private void addButtonSection(GridBagConstraints gbc) {
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 10));
         buttonPanel.setBackground(Color.WHITE);
-        buttonPanel.setBorder(BorderFactory.createEmptyBorder(15, 0, 5, 0));
         
-        JButton saveBtn = createStyledButton("💾 Save Prescription", PRIMARY_COLOR);
-        JButton printBtn = createStyledButton("🖨️ Print", new Color(255, 140, 0));
-        JButton clearBtn = createStyledButton("🗑️ Clear", new Color(108, 117, 125));
-        JButton historyBtn = createStyledButton("📋 History", new Color(155, 89, 182));
-        JButton backBtn = createStyledButton("← Back", new Color(52, 73, 94));
+        JButton saveBtn = createSkyBlueButton(" Save Prescription", false);
+        JButton printBtn = createSkyBlueButton(" Print", false);
+        JButton clearBtn = createSkyBlueButton(" Clear", false);
+        JButton historyBtn = createSkyBlueButton(" History", false);
+        JButton backBtn = createSkyBlueButton(" Back", false);
 
         saveBtn.addActionListener(e -> savePrescription());
         printBtn.addActionListener(e -> printPrescription());
         clearBtn.addActionListener(e -> clearForm());
         historyBtn.addActionListener(e -> viewHistory());
-        backBtn.addActionListener(e -> {
-            new ViewPatients().setVisible(true);
-            dispose();
-        });
+        backBtn.addActionListener(e -> dispose());
 
         buttonPanel.add(saveBtn);
         buttonPanel.add(printBtn);
@@ -439,299 +417,349 @@ public class PrescriptionForm extends JFrame {
         buttonPanel.add(historyBtn);
         buttonPanel.add(backBtn);
         
-        mainPanel.add(buttonPanel);
+        mainPanel.add(buttonPanel, gbc);
     }
 
-    private JButton createStyledButton(String text, Color bgColor) {
-        JButton button = new JButton(text);
-        button.setFont(new Font("Segoe UI", Font.BOLD, 13));
-        button.setForeground(Color.WHITE);
-        button.setBackground(bgColor);
-        button.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
-        button.setFocusPainted(false);
-        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
-
-        button.addMouseListener(new MouseAdapter() {
-            public void mouseEntered(MouseEvent evt) {
-                button.setBackground(bgColor.darker());
-            }
-            public void mouseExited(MouseEvent evt) {
-                button.setBackground(bgColor);
-            }
-        });
-
-        return button;
+    private void addDrugMasterPrescription() {
+        if (drugMasterBox.getSelectedIndex() <= 0) {
+            showWarning("Please select a prescription template");
+            return;
+        }
+        
+        String template = (String) drugMasterBox.getSelectedItem();
+        prescriptionArea.append("▶ " + template + "\n");
+        prescriptionArea.append("   ----------------------------------------\n");
+        showTemporaryStatus("✓ Prescription added: " + template);
     }
 
-    private void setupListeners() {
-
-        patientBox.addActionListener(e -> {
-
-            String selected = (String) patientBox.getSelectedItem();
-
-            if (selected != null && selected.contains("|")) {
-
-                String[] parts = selected.split("\\|");
-
-                if (parts.length >= 3) {
-                    patientAgeLabel.setText(parts[1].trim());
-                    patientGenderLabel.setText(parts[2].trim());
-                }
-            }
-        });
-    }
-    private void addMedicine() {
-
+    private void addCustomMedicine() {
         if (medicineBox.getSelectedIndex() <= 0) {
-            JOptionPane.showMessageDialog(this, "Please select a medicine");
+            showWarning("Please select a medicine");
             return;
         }
 
         String med = (String) medicineBox.getSelectedItem();
         int qty = (Integer) quantitySpinner.getValue();
         String days = daysField.getText();
-
         String morning = morningDoseField.getText();
         String afternoon = afternoonDoseField.getText();
         String evening = eveningDoseField.getText();
-
         String instruction = (String) instructionBox.getSelectedItem();
+        String instructionMar = (String) instructionMarathiBox.getSelectedItem();
 
         StringBuilder sb = new StringBuilder();
-
-        sb.append("▶ ").append(med).append(" - ").append(qty).append(" tablet(s)\n");
-        sb.append("   Dose: ")
-          .append(morning).append("-")
-          .append(afternoon).append("-")
-          .append(evening)
-          .append(" | ")
-          .append(instruction)
-          .append(" for ")
-          .append(days)
-          .append(" days\n");
-
-        sb.append("--------------------------------------------------\n");
+        sb.append("▶ ").append(med).append(" - ").append(qty).append(" tablets\n");
+        sb.append("   Dose: ").append(morning).append("-").append(afternoon).append("-").append(evening);
+        sb.append(" | ").append(instruction);
+        if (instructionMar != null && !instructionMar.isEmpty()) {
+            sb.append(" (").append(instructionMar).append(")");
+        }
+        sb.append(" for ").append(days).append(" days\n");
+        sb.append("   ----------------------------------------\n");
 
         prescriptionArea.append(sb.toString());
+        showTemporaryStatus("✓ Medicine added: " + med);
+    }
+
+    private void loadDrugMaster() {
+        drugMasterBox.removeAllItems();
+        drugMasterBox.addItem("-- Select Prescription Template --");
+        
+        // Sample drug master templates - can be loaded from database
+        String[] templates = {
+            "Amoxicillin 500mg - 1-0-1 for 7 days",
+            "Paracetamol 650mg - 1-1-1 for 5 days",
+            "Azithromycin 500mg - 1-0-0 for 3 days",
+            "Cetrizine 10mg - 1-0-1 for 10 days",
+            "Omeprazole 20mg - 0-0-1 for 14 days"
+        };
+        
+        for (String template : templates) {
+            drugMasterBox.addItem(template);
+        }
     }
 
     private void loadMedicines() {
         medicineBox.removeAllItems();
         medicineBox.addItem("-- Select Medicine --");
-
-        String sql = "SELECT medicine_name FROM medicines ORDER BY medicine_name";
-
+        
         try (Connection con = DBConnection.connect();
-             PreparedStatement ps = con.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-
+             Statement st = con.createStatement();
+             ResultSet rs = st.executeQuery("SELECT medicine_name FROM medicines ORDER BY medicine_name")) {
+            
             while (rs.next()) {
                 medicineBox.addItem(rs.getString("medicine_name"));
             }
-
         } catch (Exception e) {
             e.printStackTrace();
-            JOptionPane.showMessageDialog(this, "Error loading medicines");
         }
     }
 
     private void loadPatients() {
-
         patientBox.removeAllItems();
         patientBox.addItem("-- Select Patient --");
-
-        String sql = "SELECT name, age, gender FROM patients ORDER BY name";
-
+        
         try (Connection con = DBConnection.connect();
-             PreparedStatement ps = con.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-
+             Statement st = con.createStatement();
+             ResultSet rs = st.executeQuery("SELECT name, age, gender FROM patients ORDER BY name")) {
+            
             while (rs.next()) {
-
-                String name = rs.getString("name");
-                int age = rs.getInt("age");
-                String gender = rs.getString("gender");
-
-                patientBox.addItem(name + " | " + age + " | " + gender);
+                patientBox.addItem(rs.getString("name") + " | " + rs.getInt("age") + " | " + rs.getString("gender"));
             }
-
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
     private void savePrescription() {
-
         if (patientBox.getSelectedIndex() <= 0) {
-            JOptionPane.showMessageDialog(this, "Please select a patient");
+            showWarning("Please select a patient");
             return;
         }
-
+        
         if (prescriptionArea.getText().trim().isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Please add medicine");
+            showWarning("Please add medicine or prescription");
             return;
         }
-
-        String sql = "INSERT INTO prescriptions(patient_name,age,gender,patient_weight,medicines,notes,doctor_name,date) VALUES(?,?,?,?,?,?,?,?)";
-
+        
+        String sql = "INSERT INTO prescriptions(prescription_id, patient_name, age, gender, patient_weight, medicines, doctor_name, date) VALUES(?,?,?,?,?,?,?,?)";
+        
         try (Connection con = DBConnection.connect();
              PreparedStatement ps = con.prepareStatement(sql)) {
-
+            
             String selected = (String) patientBox.getSelectedItem();
             String name = selected.split("\\|")[0].trim();
-
-            ps.setString(1, name);
-            ps.setString(2, patientAgeLabel.getText());
-            ps.setString(3, patientGenderLabel.getText());
-            ps.setString(4, patientWeightField.getText().isEmpty() ? "N/A" : patientWeightField.getText());
-            ps.setString(5, prescriptionArea.getText());
-            ps.setString(6, adviceArea.getText());
+            
+            ps.setString(1, currentPrescriptionId);
+            ps.setString(2, name);
+            ps.setString(3, patientAgeLabel.getText());
+            ps.setString(4, patientGenderLabel.getText());
+            ps.setString(5, patientWeightField.getText().isEmpty() ? "N/A" : patientWeightField.getText());
+            ps.setString(6, prescriptionArea.getText());
             ps.setString(7, DOCTOR_NAME);
             ps.setString(8, LocalDate.now().toString());
-
+            
             ps.executeUpdate();
-
-            JOptionPane.showMessageDialog(this, "Prescription saved successfully");
-
-            clearForm();
-
+            showSuccess("Prescription saved successfully!");
+            
         } catch (Exception e) {
             e.printStackTrace();
-            JOptionPane.showMessageDialog(this, "Error saving prescription");
+            showError("Error saving prescription");
         }
     }
+
     private void printPrescription() {
-
+        if (patientBox.getSelectedIndex() <= 0) {
+            showWarning("Please select a patient first");
+            return;
+        }
+        
         try {
-
             PrinterJob job = PrinterJob.getPrinterJob();
-            job.setJobName("Prescription");
-
-            job.setPrintable(new Printable() {
-
-                public int print(Graphics g, PageFormat pf, int pageIndex) {
-
-                    if (pageIndex > 0) {
-                        return Printable.NO_SUCH_PAGE;
-                    }
-
-                    Graphics2D g2 = (Graphics2D) g;
-                    g2.translate(pf.getImageableX(), pf.getImageableY());
-
-                    int y = 250;   // 🔹 Start printing from middle (space for letterhead)
-
-                    g.setFont(new Font("Arial", Font.PLAIN, 12));
-
-                    String selected = (String) patientBox.getSelectedItem();
-                    String patientName = selected != null ? selected.split("\\|")[0].trim() : "";
-
-                    g.drawString("Patient: " + patientName, 50, y);
-                    g.drawString("Date: " + LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")), 450, y);
-
-                    y += 20;
-
-                    g.drawString("Age: " + patientAgeLabel.getText(), 50, y);
-                    g.drawString("Gender: " + patientGenderLabel.getText(), 150, y);
-                    g.drawString("Weight: " + patientWeightField.getText() + " kg", 250, y);
-
-                    y += 30;
-
-                    g.setFont(new Font("Arial", Font.BOLD | Font.ITALIC, 16));
-                    g.drawString("Rx", 50, y);
-
-                    y += 30;
-
-                    g.setFont(new Font("Monospaced", Font.PLAIN, 12));
-
-                    String[] meds = prescriptionArea.getText().split("\n");
-
-                    for (String line : meds) {
-                        g.drawString(line, 50, y);
-                        y += 18;
-                    }
-
-                    y += 20;
-
-                    g.setFont(new Font("Arial", Font.BOLD, 12));
-                    g.drawString("Advice:", 50, y);
-
-                    y += 20;
-
-                    g.setFont(new Font("Arial", Font.PLAIN, 12));
-
-                    String[] advice = adviceArea.getText().split("\n");
-
-                    for (String line : advice) {
-                        g.drawString(line, 50, y);
-                        y += 18;
-                    }
-
-                    // Signature space
-                    y += 80;
-
-                    g.drawString("____________________", 450, y);
-                    y += 15;
-                    g.drawString("Doctor Signature", 470, y);
-
-                    return Printable.PAGE_EXISTS;
+            job.setJobName("Prescription - " + currentPrescriptionId);
+            
+            PageFormat pf = job.defaultPage();
+            Paper paper = pf.getPaper();
+            paper.setImageableArea(36, 36, paper.getWidth() - 72, paper.getHeight() - 72);
+            pf.setPaper(paper);
+            
+            final String patientName = ((String) patientBox.getSelectedItem()).split("\\|")[0].trim();
+            final String prescriptionText = prescriptionArea.getText();
+            
+            job.setPrintable((Graphics g, PageFormat pageFormat, int pageIndex) -> {
+                if (pageIndex > 0) return Printable.NO_SUCH_PAGE;
+                
+                Graphics2D g2d = (Graphics2D) g;
+                g2d.translate(pageFormat.getImageableX(), pageFormat.getImageableY());
+                
+                int y = 30;
+                int leftMargin = 30;
+                
+                // Bold Header
+                g2d.setFont(new Font("Arial", Font.BOLD, 18));
+                g2d.drawString(HOSPITAL_NAME, leftMargin, y);
+                y += 25;
+                
+                // Prescription ID - BOLD and Visible
+                g2d.setFont(new Font("Arial", Font.BOLD, 12));
+                g2d.drawString("Prescription ID: " + currentPrescriptionId, leftMargin, y);
+                y += 20;
+                
+                // Patient Details
+                g2d.setFont(new Font("Arial", Font.PLAIN, 12));
+                g2d.drawString("Patient: " + patientName, leftMargin, y);
+                g2d.drawString("Date: " + LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")), 400, y);
+                y += 18;
+                
+                g2d.drawString("Age: " + patientAgeLabel.getText(), leftMargin, y);
+                g2d.drawString("Gender: " + patientGenderLabel.getText(), 150, y);
+                g2d.drawString("Weight: " + (patientWeightField.getText().isEmpty() ? "N/A" : patientWeightField.getText()) + " kg", 280, y);
+                y += 25;
+                
+                // Rx Symbol - Bold
+                g2d.setFont(new Font("Arial", Font.BOLD | Font.ITALIC, 16));
+                g2d.drawString("Rx", leftMargin, y);
+                y += 20;
+                
+                // Prescription Content
+                g2d.setFont(new Font("Monospaced", Font.PLAIN, 11));
+                String[] lines = prescriptionText.split("\n");
+                for (String line : lines) {
+                    if (y > 650) break;
+                    g2d.drawString(line, leftMargin + 20, y);
+                    y += 16;
                 }
-            });
-
+                
+                return Printable.PAGE_EXISTS;
+            }, pf);
+            
             if (job.printDialog()) {
                 job.print();
+                showTemporaryStatus("✓ Prescription sent to printer");
             }
-
         } catch (Exception e) {
             e.printStackTrace();
+            showError("Error printing: " + e.getMessage());
         }
     }
 
     private void viewHistory() {
         if (patientBox.getSelectedIndex() <= 0) {
-            JOptionPane.showMessageDialog(this, "Please select a patient first", "Warning", JOptionPane.WARNING_MESSAGE);
+            showWarning("Please select a patient first");
             return;
         }
-
+        
         String selected = (String) patientBox.getSelectedItem();
         String name = selected.split("\\|")[0].trim();
         new PrescriptionHistory(name);
     }
 
     private void clearForm() {
-
         prescriptionArea.setText("");
-        adviceArea.setText("");
-
         medicineBox.setSelectedIndex(0);
+        drugMasterBox.setSelectedIndex(0);
         quantitySpinner.setValue(1);
-
         daysField.setText("5");
-
         morningDoseField.setText("1");
         afternoonDoseField.setText("1");
         eveningDoseField.setText("1");
-
         instructionBox.setSelectedIndex(0);
+        instructionMarathiBox.setSelectedIndex(0);
+        generatePrescriptionId();
+        prescriptionIdLabel.setText(currentPrescriptionId);
+        showTemporaryStatus("✓ Form cleared");
     }
 
+    private void setupOptimizedListeners() {
+        patientBox.addActionListener(e -> {
+            SwingUtilities.invokeLater(() -> {
+                String selected = (String) patientBox.getSelectedItem();
+                if (selected != null && selected.contains("|")) {
+                    String[] parts = selected.split("\\|");
+                    if (parts.length >= 3) {
+                        patientAgeLabel.setText(parts[1].trim());
+                        patientGenderLabel.setText(parts[2].trim());
+                    }
+                }
+            });
+        });
+        
+        // Instruction sync - English to Marathi
+        instructionBox.addActionListener(e -> {
+            int idx = instructionBox.getSelectedIndex();
+            if (idx > 0 && idx <= INSTRUCTIONS.length) {
+                instructionMarathiBox.setSelectedIndex(idx);
+            }
+        });
+        
+        instructionMarathiBox.addActionListener(e -> {
+            int idx = instructionMarathiBox.getSelectedIndex();
+            if (idx > 0 && idx <= INSTRUCTIONS.length) {
+                instructionBox.setSelectedIndex(idx);
+            }
+        });
+    }
+
+    // ========== HELPER METHODS ==========
+    
+    private JLabel createBoldLabel(String text) {
+        JLabel label = new JLabel(text);
+        label.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        return label;
+    }
+    
+    private JLabel createValueLabel(String text) {
+        JLabel label = new JLabel(text);
+        label.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        label.setForeground(SKY_BLUE);
+        return label;
+    }
+    
+    private JTextField createStyledTextField(int columns) {
+        JTextField field = new JTextField(columns);
+        field.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        field.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(BORDER_COLOR, 1),
+            BorderFactory.createEmptyBorder(6, 10, 6, 10)
+        ));
+        field.setCaretColor(SKY_BLUE);
+        return field;
+    }
+    
+    private JComboBox<String> createStyledComboBox() {
+        JComboBox<String> combo = new JComboBox<>();
+        combo.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        combo.setBackground(Color.WHITE);
+        combo.setBorder(BorderFactory.createLineBorder(BORDER_COLOR, 1));
+        combo.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        return combo;
+    }
+    
+    private JButton createSkyBlueButton(String text, boolean isAddButton) {
+        JButton button = new JButton(text);
+        button.setFont(new Font("Segoe UI", Font.BOLD, isAddButton ? 13 : 12));
+        button.setForeground(Color.WHITE);
+        button.setBackground(SKY_BLUE);
+        button.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
+        button.setFocusPainted(false);
+        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        
+        button.addMouseListener(new MouseAdapter() {
+            public void mouseEntered(MouseEvent evt) {
+                button.setBackground(SKY_BLUE_DARK);
+                button.repaint();
+            }
+            public void mouseExited(MouseEvent evt) {
+                button.setBackground(SKY_BLUE);
+                button.repaint();
+            }
+        });
+        
+        return button;
+    }
+    
+    private void showSuccess(String message) {
+        JOptionPane.showMessageDialog(this, message, "Success", JOptionPane.INFORMATION_MESSAGE);
+    }
+    
+    private void showWarning(String message) {
+        JOptionPane.showMessageDialog(this, message, "Warning", JOptionPane.WARNING_MESSAGE);
+    }
+    
+    private void showError(String message) {
+        JOptionPane.showMessageDialog(this, message, "Error", JOptionPane.ERROR_MESSAGE);
+    }
+    
+    private void showTemporaryStatus(String message) {
+        System.out.println(message);
+    }
+    
     public static void main(String[] args) {
         try {
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
         } catch (Exception e) {
             e.printStackTrace();
         }
-
-        SwingUtilities.invokeLater(() -> {
-            new PrescriptionForm();
-        });
-    }
-    private void limitText(JTextField field, int limit) {
-        field.addKeyListener(new java.awt.event.KeyAdapter() {
-            public void keyTyped(java.awt.event.KeyEvent e) {
-                if (field.getText().length() >= limit || !Character.isDigit(e.getKeyChar())) {
-                    e.consume();
-                }
-            }
-        });
+        SwingUtilities.invokeLater(() -> new PrescriptionForm());
     }
 }

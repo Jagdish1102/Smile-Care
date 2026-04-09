@@ -1,4 +1,5 @@
-package UI;
+package UI;  
+
 import dao.PatientDAO;
 import model.Patient;
 
@@ -18,26 +19,37 @@ public class AddPatientForm extends JFrame {
     private JPanel cardPanel;
     private JButton saveBtn, viewBtn, backBtn;
     private JPanel formPanel;
+    private JButton prescriptionBtn;
     
+    // Store the last saved patient name for quick prescription access
+    private String lastSavedPatientName = null;
+    private int lastSavedPatientAge = 0;
+    private String lastSavedPatientGender = null;
+
     // Flag to prevent multiple saves
-    private boolean isSaving = false;
+    private volatile boolean isSaving = false;
+    private Timer statusTimer;
+    private Timer successDialogTimer;
 
     // Hospital Theme Colors
     private final Color PRIMARY_COLOR = new Color(0, 102, 204);
     private final Color SECONDARY_COLOR = new Color(0, 153, 76);
     private final Color PANEL_COLOR = Color.WHITE;
-    private final Color TEXT_COLOR = new Color(50, 50, 50);
     private final Color BORDER_COLOR = new Color(220, 220, 220);
 
     public AddPatientForm() {
 
         setTitle("Hospital Management System - Add New Patient");
-        setIconImage(AppResources.getAppIcon()); // window icon
-        setExtendedState(JFrame.MAXIMIZED_BOTH);
+        setIconImage(AppResources.getAppIcon());
+
+        // Set default size
+        setSize(850, 550);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setMinimumSize(new Dimension(800, 600));
+        setResizable(true);
 
-        // Set background gradient
+        // Optimized background panel
         JPanel backgroundPanel = new JPanel() {
             @Override
             protected void paintComponent(Graphics g) {
@@ -56,82 +68,154 @@ public class AddPatientForm extends JFrame {
         backgroundPanel.setLayout(new BorderLayout());
         setContentPane(backgroundPanel);
 
-        // Main container with padding
-        JPanel mainContainer = new JPanel(new BorderLayout(20, 20));
+        // Main container
+        JPanel mainContainer = new JPanel(new BorderLayout(10, 10));
         mainContainer.setOpaque(false);
-        mainContainer.setBorder(BorderFactory.createEmptyBorder(30, 50, 30, 50));
+        mainContainer.setBorder(BorderFactory.createEmptyBorder(15, 30, 15, 30));
         backgroundPanel.add(mainContainer, BorderLayout.CENTER);
 
-        // ========== HEADER SECTION ==========
+        // Header Section
         JPanel headerPanel = createHeaderPanel();
         mainContainer.add(headerPanel, BorderLayout.NORTH);
 
-        // ========== CENTER CARD ==========
-        cardPanel = new JPanel();
-        cardPanel.setLayout(new BorderLayout());
+        // Center Card
+        cardPanel = new JPanel(new BorderLayout());
         cardPanel.setBackground(PANEL_COLOR);
         cardPanel.setBorder(createCardBorder());
 
-        // Add inner padding
+        // Inner Content
         JPanel contentPanel = new JPanel(new BorderLayout());
         contentPanel.setBackground(PANEL_COLOR);
-        contentPanel.setBorder(BorderFactory.createEmptyBorder(30, 50, 30, 50));
+        contentPanel.setBorder(BorderFactory.createEmptyBorder(15, 25, 15, 25));
         cardPanel.add(contentPanel, BorderLayout.CENTER);
 
-        // Form title
-        JLabel formTitle = new JLabel("Patient Registration Form");
-        formTitle.setFont(new Font("Segoe UI", Font.BOLD, 26));
-        formTitle.setForeground(PRIMARY_COLOR);
-        formTitle.setBorder(BorderFactory.createEmptyBorder(0, 0, 20, 0));
-        formTitle.setHorizontalAlignment(SwingConstants.CENTER);
-        contentPanel.add(formTitle, BorderLayout.NORTH);
+        contentPanel.add(Box.createVerticalStrut(10), BorderLayout.NORTH);
 
-        // ========== FORM PANEL WITH SCROLLING ==========
+        // Form Panel
         formPanel = new JPanel(new GridBagLayout());
         formPanel.setBackground(PANEL_COLOR);
 
-        // Wrap form panel in scroll pane to ensure all fields are visible
         JScrollPane scrollPane = new JScrollPane(formPanel);
         scrollPane.setBorder(null);
         scrollPane.getViewport().setBackground(PANEL_COLOR);
         scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+        scrollPane.getVerticalScrollBar().setUnitIncrement(20);
         contentPanel.add(scrollPane, BorderLayout.CENTER);
 
+        setupFormFields();
+
+        // Button Panel
+        JPanel southContainer = createButtonPanel();
+        contentPanel.add(southContainer, BorderLayout.SOUTH);
+
+        mainContainer.add(cardPanel, BorderLayout.CENTER);
+
+        // Footer
+        JPanel footerPanel = createFooterPanel();
+        mainContainer.add(footerPanel, BorderLayout.SOUTH);
+
+        // Setup Actions
+        setupActions();
+        setupInputValidation();
+        setupEnterKeyFunctionality();
+
+        // Pre-fetch focus
+        SwingUtilities.invokeLater(() -> nameField.requestFocusInWindow());
+    }
+
+    private JPanel createHeaderPanel() {
+        JPanel headerPanel = new JPanel(new BorderLayout());
+        headerPanel.setOpaque(false);
+        headerPanel.setBorder(BorderFactory.createEmptyBorder(5, 10, 10, 10));
+
+        JPanel leftPanel = new JPanel();
+        leftPanel.setLayout(new BoxLayout(leftPanel, BoxLayout.X_AXIS));
+        leftPanel.setOpaque(false);
+
+        JLabel logoLabel;
+        if (AppResources.getLogo() != null) {
+            logoLabel = new JLabel(AppResources.getLogo());
+        } else {
+            logoLabel = new JLabel("🏥");
+            logoLabel.setFont(new Font("Segoe UI", Font.PLAIN, 32));
+        }
+        leftPanel.add(logoLabel);
+        leftPanel.add(Box.createHorizontalStrut(8));
+
+        JPanel titlePanel = new JPanel();
+        titlePanel.setLayout(new BoxLayout(titlePanel, BoxLayout.Y_AXIS));
+        titlePanel.setOpaque(false);
+
+        JLabel hospitalName = new JLabel("Smile Care Dental Clinic");
+        hospitalName.setFont(new Font("Segoe UI", Font.BOLD, 16));
+        hospitalName.setForeground(PRIMARY_COLOR);
+
+        titlePanel.add(hospitalName);
+        leftPanel.add(titlePanel);
+        headerPanel.add(leftPanel, BorderLayout.WEST);
+
+        JPanel rightPanel = new JPanel();
+        rightPanel.setLayout(new BoxLayout(rightPanel, BoxLayout.Y_AXIS));
+        rightPanel.setOpaque(false);
+
+        LocalDate currentDate = LocalDate.now();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd MMM yyyy");
+
+        JLabel dateLabel = new JLabel(currentDate.format(formatter));
+        dateLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        dateLabel.setForeground(PRIMARY_COLOR);
+        dateLabel.setAlignmentX(Component.RIGHT_ALIGNMENT);
+
+        JLabel timeLabel = new JLabel();
+        timeLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        timeLabel.setForeground(Color.GRAY);
+        timeLabel.setAlignmentX(Component.RIGHT_ALIGNMENT);
+
+        Timer timer = new Timer(1000,
+                e -> timeLabel.setText(new java.text.SimpleDateFormat("hh:mm:ss a").format(new java.util.Date())));
+        timer.start();
+
+        rightPanel.add(dateLabel);
+        rightPanel.add(timeLabel);
+        headerPanel.add(rightPanel, BorderLayout.EAST);
+
+        return headerPanel;
+    }
+
+    private void setupFormFields() {
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(8, 10, 8, 10);
-        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.fill = GridBagConstraints.BOTH;
         gbc.anchor = GridBagConstraints.WEST;
 
-        Font labelFont = new Font("Segoe UI", Font.BOLD, 14);
-        Font fieldFont = new Font("Segoe UI", Font.PLAIN, 14);
-
-        // Create a panel with fixed width for labels
-        int labelWidth = 140;
-        int fieldWidth = 280;
+        Font labelFont = new Font("Segoe UI", Font.BOLD, 16);
+        Font fieldFont = new Font("Segoe UI", Font.PLAIN, 16);
+        int labelWidth = 100;
+        int fieldHeight = 40;
         int row = 0;
-     // Row 0: Full Name (Manual)
-        gbc.gridy = row++;
+
+        // ROW 1: Full Name
+        gbc.gridy = row;
         gbc.gridx = 0;
         gbc.weightx = 0;
         gbc.gridwidth = 1;
 
         JLabel nameLabel = new JLabel("Full Name:");
         nameLabel.setFont(labelFont);
-        nameLabel.setPreferredSize(new Dimension(labelWidth, 30));
+        nameLabel.setPreferredSize(new Dimension(labelWidth, fieldHeight));
         formPanel.add(nameLabel, gbc);
 
         gbc.gridx = 1;
-        gbc.weightx = 1;
+        gbc.weightx = 1.0;
         gbc.gridwidth = 3;
-
-        nameField = createStyledTextField("", fieldFont, false);
-        nameField.setPreferredSize(new Dimension(fieldWidth, 35));
-        nameField.setToolTipText("Enter patient's full name");
+        nameField = createSensitiveTextField("", fieldFont);
+        nameField.setPreferredSize(new Dimension(0, fieldHeight));
         formPanel.add(nameField, gbc);
 
+        row++;
 
-        // Row 1: Age & Gender
+        // ROW 2: Age and Gender
         gbc.gridy = row;
         gbc.gridx = 0;
         gbc.weightx = 0;
@@ -139,307 +223,229 @@ public class AddPatientForm extends JFrame {
 
         JLabel ageLabel = new JLabel("Age:");
         ageLabel.setFont(labelFont);
-        ageLabel.setPreferredSize(new Dimension(labelWidth, 30));
+        ageLabel.setPreferredSize(new Dimension(labelWidth, fieldHeight));
         formPanel.add(ageLabel, gbc);
 
         gbc.gridx = 1;
-        gbc.weightx = 1;
+        gbc.weightx = 0.2;
         gbc.gridwidth = 1;
-
-        ageField = createStyledTextField("", fieldFont, false);
-        ageField.setPreferredSize(new Dimension(80, 35));
-        ageField.setToolTipText("Enter age in years");
+        ageField = createSensitiveTextField("", fieldFont);
+        ageField.setPreferredSize(new Dimension(100, fieldHeight));
         formPanel.add(ageField, gbc);
 
-
-        // Gender
         gbc.gridx = 2;
         gbc.weightx = 0;
         gbc.gridwidth = 1;
-
         JLabel genderLabel = new JLabel("Gender:");
         genderLabel.setFont(labelFont);
-        genderLabel.setPreferredSize(new Dimension(70, 30));
         formPanel.add(genderLabel, gbc);
 
         gbc.gridx = 3;
-        gbc.weightx = 1;
+        gbc.weightx = 0.5;
         gbc.gridwidth = 1;
-
-        genderBox = new JComboBox<>(new String[]{"Select Gender", "Male", "Female", "Other"});
+        genderBox = new JComboBox<>(new String[] { "Select", "Male", "Female", "Other" });
         genderBox.setFont(fieldFont);
-        genderBox.setBackground(PANEL_COLOR);
-        genderBox.setPreferredSize(new Dimension(130, 35));
-        genderBox.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(BORDER_COLOR),
-                BorderFactory.createEmptyBorder(5, 8, 5, 8)
-        ));
+        genderBox.setPreferredSize(new Dimension(120, fieldHeight));
+        genderBox.setBackground(Color.WHITE);
         formPanel.add(genderBox, gbc);
 
         row++;
 
-
-        // Row 2: Phone Number
-        gbc.gridy = row++;
+        // ROW 3: Phone Number and Address
+        gbc.gridy = row;
         gbc.gridx = 0;
         gbc.weightx = 0;
         gbc.gridwidth = 1;
 
-        JLabel phoneLabel = new JLabel("Phone Number:");
+        JLabel phoneLabel = new JLabel("Phone:");
         phoneLabel.setFont(labelFont);
-        phoneLabel.setPreferredSize(new Dimension(labelWidth, 30));
+        phoneLabel.setPreferredSize(new Dimension(labelWidth, fieldHeight));
         formPanel.add(phoneLabel, gbc);
 
         gbc.gridx = 1;
-        gbc.weightx = 1;
-        gbc.gridwidth = 3;
-
-        phoneField = createStyledTextField("", fieldFont, false);
-        phoneField.setPreferredSize(new Dimension(fieldWidth, 35));
-        phoneField.setToolTipText("Enter 10-digit mobile number");
+        gbc.weightx = 0.4;
+        gbc.gridwidth = 1;
+        phoneField = createSensitiveTextField("", fieldFont);
+        phoneField.setPreferredSize(new Dimension(0, fieldHeight));
         formPanel.add(phoneField, gbc);
 
-
-        // Row 3: Address
-        gbc.gridy = row++;
-        gbc.gridx = 0;
+        gbc.gridx = 2;
         gbc.weightx = 0;
         gbc.gridwidth = 1;
-
         JLabel addressLabel = new JLabel("Address:");
         addressLabel.setFont(labelFont);
-        addressLabel.setPreferredSize(new Dimension(labelWidth, 30));
         formPanel.add(addressLabel, gbc);
 
-        gbc.gridx = 1;
-        gbc.weightx = 1;
-        gbc.gridwidth = 3;
-
-        addressField = createStyledTextField("", fieldFont, false);
-        addressField.setPreferredSize(new Dimension(fieldWidth, 35));
-        addressField.setToolTipText("Enter complete address");
+        gbc.gridx = 3;
+        gbc.weightx = 0.6;
+        gbc.gridwidth = 1;
+        addressField = createSensitiveTextField("", fieldFont);
+        addressField.setPreferredSize(new Dimension(0, fieldHeight));
         formPanel.add(addressField, gbc);
 
+        row++;
 
-        // Row 4: Disease/Complaint
-        gbc.gridy = row++;
+        // ROW 4: Symptoms/Email
+        gbc.gridy = row;
         gbc.gridx = 0;
         gbc.weightx = 0;
         gbc.gridwidth = 1;
 
-        JLabel diseaseLabel = new JLabel("Disease/Complaint:");
+        JLabel diseaseLabel = new JLabel("Symptoms/Email:");
         diseaseLabel.setFont(labelFont);
-        diseaseLabel.setPreferredSize(new Dimension(labelWidth, 30));
+        diseaseLabel.setPreferredSize(new Dimension(labelWidth, fieldHeight));
         formPanel.add(diseaseLabel, gbc);
 
         gbc.gridx = 1;
-        gbc.weightx = 1;
+        gbc.weightx = 1.0;
         gbc.gridwidth = 3;
-
-        diseaseField = createStyledTextField("", fieldFont, false);
-        diseaseField.setPreferredSize(new Dimension(fieldWidth, 35));
-        diseaseField.setToolTipText("Enter primary diagnosis or complaint");
+        diseaseField = createSensitiveTextField("", fieldFont);
+        diseaseField.setPreferredSize(new Dimension(0, fieldHeight));
+        diseaseField.setToolTipText("Enter symptoms or email address");
         formPanel.add(diseaseField, gbc);
-
-        // Add empty space at bottom for better scrolling
-        gbc.gridy = row++;
-        gbc.gridx = 0;
-        gbc.weighty = 0.1;
-        gbc.gridwidth = 4;
-        formPanel.add(Box.createVerticalStrut(20), gbc);
-
-        // ========== BUTTON AND STATUS PANEL ==========
-        JPanel southContainer = new JPanel(new BorderLayout());
-        southContainer.setBackground(PANEL_COLOR);
-        southContainer.setBorder(BorderFactory.createEmptyBorder(15, 0, 5, 0));
-
-        // Separator line
-        JSeparator separator = new JSeparator();
-        separator.setForeground(BORDER_COLOR);
-        southContainer.add(separator, BorderLayout.NORTH);
-
-        // Button panel
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 15));
-        buttonPanel.setBackground(PANEL_COLOR);
-
-        saveBtn = createStyledButton("💾 SAVE PATIENT", SECONDARY_COLOR);
-        viewBtn = createStyledButton("👥 VIEW PATIENTS", PRIMARY_COLOR);
-        backBtn = createStyledButton("← BACK TO DASHBOARD", new Color(108, 117, 125));
-
-        // Set button sizes
-        saveBtn.setPreferredSize(new Dimension(160, 45));
-        viewBtn.setPreferredSize(new Dimension(160, 45));
-        backBtn.setPreferredSize(new Dimension(180, 45));
-
-        buttonPanel.add(saveBtn);
-        buttonPanel.add(viewBtn);
-        buttonPanel.add(backBtn);
-
-        southContainer.add(buttonPanel, BorderLayout.CENTER);
-
-        // Status panel
-        JPanel statusPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
-        statusPanel.setBackground(PANEL_COLOR);
-        statusLabel = new JLabel(" ");
-        statusLabel.setFont(new Font("Segoe UI", Font.BOLD, 13));
-        statusLabel.setForeground(SECONDARY_COLOR);
-        statusPanel.add(statusLabel);
-        southContainer.add(statusPanel, BorderLayout.SOUTH);
-
-        // Add the combined south panel to content
-        contentPanel.add(southContainer, BorderLayout.SOUTH);
-
-        mainContainer.add(cardPanel, BorderLayout.CENTER);
-
-        // ========== FOOTER ==========
-        JPanel footerPanel = createFooterPanel();
-        mainContainer.add(footerPanel, BorderLayout.SOUTH);
-
-        // ========== BUTTON ACTIONS ==========
-        setupActions();
-
-        // Add input validation
-        setupInputValidation();
-
-        // ========== ADD ENTER KEY FUNCTIONALITY ==========
-        setupEnterKeyFunctionality();
     }
 
-    private JPanel createHeaderPanel() {
-        JPanel headerPanel = new JPanel(new BorderLayout());
-        headerPanel.setOpaque(false);
-        headerPanel.setBorder(BorderFactory.createEmptyBorder(0, 10, 15, 10));
-
-     // Hospital logo and name
-        JPanel logoPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
-        logoPanel.setOpaque(false);
-
-        // Use cached logo (loaded only once)
-        JLabel logoLabel;
-
-        if (AppResources.getLogo() != null) {
-            logoLabel = new JLabel(AppResources.getLogo());
-        } else {
-            logoLabel = new JLabel("🏥");
-            logoLabel.setFont(new Font("Segoe UI", Font.PLAIN, 42));
-        }
-
-        logoPanel.add(logoLabel);
-        // Title panel
-        JPanel titlePanel = new JPanel(new GridLayout(2, 1));
-        titlePanel.setOpaque(false);
-
-        JLabel hospitalName = new JLabel("Smile Care Dental Clinic And Implant Center");
-        hospitalName.setFont(new Font("Segoe UI", Font.BOLD, 20));
-        hospitalName.setForeground(PRIMARY_COLOR);
-        titlePanel.add(hospitalName);
-
-        JLabel tagline = new JLabel("Patient Registration Desk");
-        tagline.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        tagline.setForeground(Color.GRAY);
-        titlePanel.add(tagline);
-
-        logoPanel.add(titlePanel);
-        headerPanel.add(logoPanel, BorderLayout.WEST);
-
-        // Date and time panel
-        JPanel dateTimePanel = new JPanel(new GridLayout(2, 1));
-        dateTimePanel.setOpaque(false);
-        dateTimePanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 10));
-
-        LocalDate currentDate = LocalDate.now();
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("EEEE, MMMM dd, yyyy");
-
-        JLabel dateLabel = new JLabel(currentDate.format(formatter));
-        dateLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
-        dateLabel.setForeground(PRIMARY_COLOR);
-        dateLabel.setHorizontalAlignment(SwingConstants.RIGHT);
-        dateTimePanel.add(dateLabel);
-
-        JLabel timeLabel = new JLabel();
-        timeLabel.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        timeLabel.setForeground(Color.GRAY);
-        timeLabel.setHorizontalAlignment(SwingConstants.RIGHT);
-
-        // Update time
-        Timer timer = new Timer(1000, e -> {
-            java.text.SimpleDateFormat timeFormat = new java.text.SimpleDateFormat("hh:mm:ss a");
-            timeLabel.setText(timeFormat.format(new java.util.Date()));
-        });
-        timer.start();
-        dateTimePanel.add(timeLabel);
-
-        headerPanel.add(dateTimePanel, BorderLayout.EAST);
-
-        return headerPanel;
-    }
-
-    private JPanel createFooterPanel() {
-        JPanel footerPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
-        footerPanel.setOpaque(false);
-        footerPanel.setBorder(BorderFactory.createEmptyBorder(15, 0, 5, 0));
-
-        JLabel footerLabel = new JLabel("© 202 Smile Care Dental Clinic And Implant Center | Version 3.0 | All Rights Reserved");
-        footerLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-        footerLabel.setForeground(new Color(150, 150, 150));
-        footerPanel.add(footerLabel);
-
-        return footerPanel;
-    }
-
-    private Border createCardBorder() {
-        return BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(BORDER_COLOR, 1),
-                BorderFactory.createEmptyBorder(20, 20, 20, 20));
-    }
-
-    private JTextField createStyledTextField(String text, Font font, boolean isDisabled) {
+    private JTextField createSensitiveTextField(String text, Font font) {
         JTextField tf = new JTextField(text);
         tf.setFont(font);
-        tf.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(BORDER_COLOR),
-                BorderFactory.createEmptyBorder(8, 12, 8, 12)));
-        tf.setBackground(isDisabled ? new Color(245, 245, 245) : PANEL_COLOR);
-        tf.setForeground(TEXT_COLOR);
+        tf.setHorizontalAlignment(JTextField.LEFT);
+        tf.setMargin(new Insets(10, 12, 10, 12));
+        tf.setBackground(Color.WHITE);
+        tf.setForeground(new Color(40, 40, 40));
+        tf.setCaretColor(PRIMARY_COLOR);
+        tf.setFocusable(true);
+        tf.setRequestFocusEnabled(true);
+        tf.setCursor(new Cursor(Cursor.TEXT_CURSOR));
 
-        if (!isDisabled) {
-            tf.addFocusListener(new FocusAdapter() {
-                @Override
-                public void focusGained(FocusEvent e) {
-                    tf.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(PRIMARY_COLOR, 2),
-                            BorderFactory.createEmptyBorder(7, 11, 7, 11)));
-                }
+        tf.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                tf.requestFocusInWindow();
+            }
 
-                @Override
-                public void focusLost(FocusEvent e) {
-                    tf.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(BORDER_COLOR),
-                            BorderFactory.createEmptyBorder(8, 12, 8, 12)));
-                }
-            });
-        }
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                tf.setCursor(new Cursor(Cursor.TEXT_CURSOR));
+            }
+        });
+
+        Border defaultBorder = BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(200, 200, 200), 2, true),
+                BorderFactory.createEmptyBorder(8, 12, 8, 12));
+        tf.setBorder(defaultBorder);
+
+        tf.addFocusListener(new FocusAdapter() {
+            @Override
+            public void focusGained(FocusEvent e) {
+                tf.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(PRIMARY_COLOR, 2, true),
+                        BorderFactory.createEmptyBorder(8, 12, 8, 12)));
+                tf.setBackground(new Color(245, 250, 255));
+            }
+
+            @Override
+            public void focusLost(FocusEvent e) {
+                tf.setBorder(defaultBorder);
+                tf.setBackground(Color.WHITE);
+            }
+        });
 
         return tf;
     }
 
+    private JPanel createButtonPanel() {
+        JPanel southContainer = new JPanel(new BorderLayout());
+        southContainer.setBackground(PANEL_COLOR);
+        southContainer.setBorder(BorderFactory.createEmptyBorder(12, 0, 5, 0));
+
+        JSeparator bottomSeparator = new JSeparator(SwingConstants.HORIZONTAL);
+        bottomSeparator.setForeground(BORDER_COLOR);
+        southContainer.add(bottomSeparator, BorderLayout.NORTH);
+
+        JPanel buttonPanel = new JPanel(new GridLayout(2, 2, 10, 10));
+        buttonPanel.setBackground(PANEL_COLOR);
+
+        saveBtn = createStyledButton(" SAVE", PRIMARY_COLOR);
+        viewBtn = createStyledButton(" VIEW", PRIMARY_COLOR);
+        backBtn = createStyledButton(" BACK", PRIMARY_COLOR);
+        prescriptionBtn = createStyledButton(" PRESCRIPTION", new Color(155, 89, 182));
+
+        saveBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+        viewBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+        backBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+        prescriptionBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+
+        buttonPanel.add(saveBtn);
+        buttonPanel.add(viewBtn);
+        buttonPanel.add(prescriptionBtn);
+        buttonPanel.add(backBtn);
+
+        southContainer.add(buttonPanel, BorderLayout.CENTER);
+
+        JPanel statusPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        statusPanel.setBackground(PANEL_COLOR);
+
+        statusLabel = new JLabel(" ");
+        statusLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        statusLabel.setForeground(SECONDARY_COLOR);
+
+        statusPanel.add(statusLabel);
+        southContainer.add(statusPanel, BorderLayout.SOUTH);
+
+        return southContainer;
+    }
+
+    private JPanel createFooterPanel() {
+        JPanel footerPanel = new JPanel(new BorderLayout());
+        footerPanel.setOpaque(false);
+        footerPanel.setBorder(BorderFactory.createEmptyBorder(8, 15, 8, 15));
+
+        JLabel leftLabel = new JLabel("© " + java.time.Year.now().getValue() + " Smile Care");
+        leftLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        leftLabel.setForeground(new Color(120, 120, 120));
+
+        JLabel rightLabel = new JLabel("Version 3.0");
+        rightLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        rightLabel.setForeground(new Color(120, 120, 120));
+        rightLabel.setHorizontalAlignment(SwingConstants.RIGHT);
+
+        footerPanel.add(leftLabel, BorderLayout.WEST);
+        footerPanel.add(rightLabel, BorderLayout.EAST);
+
+        return footerPanel;
+    }
+
     private JButton createStyledButton(String text, Color bgColor) {
         JButton button = new JButton(text);
-        button.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        button.setFont(new Font("Segoe UI", Font.BOLD, 13));
         button.setForeground(Color.WHITE);
         button.setBackground(bgColor);
-        button.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
         button.setFocusPainted(false);
         button.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        button.setPreferredSize(new Dimension(150, 40));
+        button.setBorder(BorderFactory.createEmptyBorder(8, 15, 8, 15));
+        button.setContentAreaFilled(false);
+        button.setOpaque(true);
 
-        // Hover effect
-        button.addMouseListener(new java.awt.event.MouseAdapter() {
-            public void mouseEntered(java.awt.event.MouseEvent evt) {
+        button.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                button.setBackground(bgColor.brighter());
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                button.setBackground(bgColor);
+            }
+
+            @Override
+            public void mousePressed(MouseEvent e) {
                 button.setBackground(bgColor.darker());
             }
 
-            public void mouseExited(java.awt.event.MouseEvent evt) {
-                button.setBackground(bgColor);
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                button.setBackground(bgColor.brighter());
             }
         });
-
         return button;
     }
 
@@ -454,13 +460,51 @@ public class AddPatientForm extends JFrame {
             dispose();
         });
 
-        saveBtn.addActionListener((ActionEvent e) -> {
-            savePatient();
+        saveBtn.addActionListener(e -> savePatient());
+        
+        // Prescription button action - opens prescription for last saved patient
+        prescriptionBtn.addActionListener(e -> openPrescriptionForLastPatient());
+    }
+
+    /**
+     * Opens prescription form for the last saved patient
+     * This is fast and reusable - directly opens without any selection
+     */
+    private void openPrescriptionForLastPatient() {
+        if (lastSavedPatientName == null || lastSavedPatientName.isEmpty()) {
+            // If no patient saved yet, try to save current form first
+            int confirm = JOptionPane.showConfirmDialog(this,
+                "No patient saved yet. Would you like to save this patient first?",
+                "Save Patient First",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.QUESTION_MESSAGE);
+            
+            if (confirm == JOptionPane.YES_OPTION) {
+                savePatient();
+            } else {
+                showError("Please save a patient first before opening prescription");
+            }
+            return;
+        }
+        
+        // Fast open - directly create prescription form with the saved patient
+        SwingUtilities.invokeLater(() -> {
+            PrescriptionForm prescriptionForm = new PrescriptionForm();
+            
+            // Auto-select the patient in prescription form
+            for (int i = 0; i < prescriptionForm.patientBox.getItemCount(); i++) {
+                String item = prescriptionForm.patientBox.getItemAt(i);
+                if (item != null && item.startsWith(lastSavedPatientName)) {
+                    prescriptionForm.patientBox.setSelectedIndex(i);
+                    break;
+                }
+            }
+            
+            prescriptionForm.setVisible(true);
         });
     }
 
     private void setupInputValidation() {
-        // Age field - only numbers
         ageField.addKeyListener(new KeyAdapter() {
             public void keyTyped(KeyEvent e) {
                 char c = e.getKeyChar();
@@ -469,24 +513,9 @@ public class AddPatientForm extends JFrame {
                 }
             }
         });
-
-        // Phone field - only numbers, max 10 digits
-        phoneField.addKeyListener(new KeyAdapter() {
-            public void keyTyped(KeyEvent e) {
-                char c = e.getKeyChar();
-                if (!Character.isDigit(c) || phoneField.getText().length() >= 10) {
-                    e.consume();
-                }
-            }
-        });
     }
 
-    /**
-     * Set up Enter key functionality for all input fields
-     * Pressing Enter will trigger the save operation
-     */
     private void setupEnterKeyFunctionality() {
-        // Create a single Action for Enter key
         Action enterAction = new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -494,73 +523,59 @@ public class AddPatientForm extends JFrame {
             }
         };
 
-        // Set up Enter key for each text field using InputMap/ActionMap
         setupEnterKeyForTextField(nameField, enterAction);
         setupEnterKeyForTextField(ageField, enterAction);
         setupEnterKeyForTextField(phoneField, enterAction);
         setupEnterKeyForTextField(addressField, enterAction);
         setupEnterKeyForTextField(diseaseField, enterAction);
-        
-        // Set up Enter key for combo box
         setupEnterKeyForComboBox(genderBox, enterAction);
     }
-    
-    /**
-     * Helper method to set up Enter key for text fields
-     */
+
     private void setupEnterKeyForTextField(JTextField field, Action action) {
-        // Remove any existing action listeners first
-        ActionListener[] listeners = field.getActionListeners();
-        for (ActionListener listener : listeners) {
-            field.removeActionListener(listener);
-        }
-        
-        // Add the new action listener
-        field.addActionListener(action);
-        
-        // Also set up InputMap/ActionMap for more control
-        field.getInputMap(JComponent.WHEN_FOCUSED).put(
-            KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "enter");
+        field.getInputMap(JComponent.WHEN_FOCUSED).put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "enter");
         field.getActionMap().put("enter", action);
     }
-    
-    /**
-     * Helper method to set up Enter key for combo box
-     */
+
     private void setupEnterKeyForComboBox(JComboBox<String> comboBox, Action action) {
-        comboBox.getInputMap(JComponent.WHEN_FOCUSED).put(
-            KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "enter");
+        comboBox.getInputMap(JComponent.WHEN_FOCUSED).put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "enter");
         comboBox.getActionMap().put("enter", action);
     }
 
     private void savePatient() {
-        // Prevent multiple rapid saves
-        if (isSaving) {
+        if (isSaving)
             return;
-        }
-        
-        // Validate inputs
-        if (!validateInputs()) {
+
+        if (!validateInputs())
             return;
-        }
 
         isSaving = true;
         saveBtn.setEnabled(false);
 
-        // Use SwingWorker for background operation
         SwingWorker<Boolean, Void> worker = new SwingWorker<Boolean, Void>() {
             @Override
             protected Boolean doInBackground() throws Exception {
-                String name = nameField.getText().trim();
-                int age = Integer.parseInt(ageField.getText().trim());
-                String gender = genderBox.getSelectedItem().toString();
+                String name = nameField.getText().trim().toUpperCase();
+                int age = 0;
+                if (!ageField.getText().trim().isEmpty()) {
+                    age = Integer.parseInt(ageField.getText().trim());
+                }
+                String gender = genderBox.getSelectedIndex() == 0 ? "" : genderBox.getSelectedItem().toString();
                 String phone = phoneField.getText().trim();
-                String address = addressField.getText().trim();
-                String disease = diseaseField.getText().trim();
+                String address = addressField.getText().trim().toUpperCase();
+                String disease = diseaseField.getText().trim().toUpperCase();
                 String date = LocalDate.now().toString();
 
                 Patient p = new Patient(name, age, gender, phone, address, disease, date);
-                return PatientDAO.addPatient(p);
+                boolean success = PatientDAO.addPatient(p);
+                
+                if (success) {
+                    // Store the saved patient details for quick prescription access
+                    lastSavedPatientName = name;
+                    lastSavedPatientAge = age;
+                    lastSavedPatientGender = gender;
+                }
+                
+                return success;
             }
 
             @Override
@@ -581,7 +596,6 @@ public class AddPatientForm extends JFrame {
                 }
             }
         };
-        
         worker.execute();
     }
 
@@ -591,49 +605,6 @@ public class AddPatientForm extends JFrame {
             nameField.requestFocus();
             return false;
         }
-
-        if (ageField.getText().trim().isEmpty()) {
-            showError("Please enter age");
-            ageField.requestFocus();
-            return false;
-        }
-
-        try {
-            int age = Integer.parseInt(ageField.getText().trim());
-            if (age < 0 || age > 150) {
-                showError("Please enter a valid age (0-150)");
-                ageField.requestFocus();
-                return false;
-            }
-        } catch (NumberFormatException e) {
-            showError("Please enter a valid age");
-            ageField.requestFocus();
-            return false;
-        }
-
-        if (genderBox.getSelectedIndex() == 0) {
-            showError("Please select gender");
-            return false;
-        }
-
-        if (phoneField.getText().trim().isEmpty()) {
-            showError("Please enter phone number");
-            phoneField.requestFocus();
-            return false;
-        }
-
-        if (phoneField.getText().length() != 10) {
-            showError("Please enter a valid 10-digit phone number");
-            phoneField.requestFocus();
-            return false;
-        }
-
-        if (addressField.getText().trim().isEmpty()) {
-            showError("Please enter address");
-            addressField.requestFocus();
-            return false;
-        }
-
         return true;
     }
 
@@ -641,36 +612,47 @@ public class AddPatientForm extends JFrame {
         statusLabel.setText("✓ " + message);
         statusLabel.setForeground(SECONDARY_COLOR);
 
-        // Show auto-closing dialog
+        if (successDialogTimer != null && successDialogTimer.isRunning()) {
+            successDialogTimer.stop();
+        }
+        if (statusTimer != null && statusTimer.isRunning()) {
+            statusTimer.stop();
+        }
+
         JDialog dialog = new JDialog(this, "Success", false);
-        dialog.setSize(260, 100);
+        dialog.setSize(250, 90);
         dialog.setLocationRelativeTo(this);
 
         JLabel label = new JLabel("✓ " + message, SwingConstants.CENTER);
-        label.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        label.setFont(new Font("Segoe UI", Font.BOLD, 13));
         dialog.add(label);
 
-        Timer timer = new Timer(1000, e -> dialog.dispose());
-        timer.setRepeats(false);
-        timer.start();
-
+        successDialogTimer = new Timer(1000, e -> dialog.dispose());
+        successDialogTimer.setRepeats(false);
+        successDialogTimer.start();
         dialog.setVisible(true);
 
-        // Clear status after 3 seconds
-        Timer t = new Timer(3000, ev -> statusLabel.setText(" "));
-        t.setRepeats(false);
-        t.start();
+        statusTimer = new Timer(3000, ev -> statusLabel.setText(" "));
+        statusTimer.setRepeats(false);
+        statusTimer.start();
     }
 
     private void showError(String message) {
         statusLabel.setText("✗ " + message);
         statusLabel.setForeground(Color.RED);
-
-        // Show popup
         JOptionPane.showMessageDialog(this, message, "Validation Error", JOptionPane.WARNING_MESSAGE);
 
-        // Clear status after 3 seconds
-        new javax.swing.Timer(3000, ev -> statusLabel.setText(" ")).start();
+        if (statusTimer != null && statusTimer.isRunning()) {
+            statusTimer.stop();
+        }
+        statusTimer = new Timer(3000, ev -> statusLabel.setText(" "));
+        statusTimer.setRepeats(false);
+        statusTimer.start();
+    }
+
+    private Border createCardBorder() {
+        return BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(BORDER_COLOR, 1, true),
+                BorderFactory.createEmptyBorder(15, 15, 15, 15));
     }
 
     private void clearFields() {
@@ -683,15 +665,29 @@ public class AddPatientForm extends JFrame {
         nameField.requestFocus();
     }
 
+    @Override
+    public void dispose() {
+        if (statusTimer != null && statusTimer.isRunning()) {
+            statusTimer.stop();
+        }
+        if (successDialogTimer != null && successDialogTimer.isRunning()) {
+            successDialogTimer.stop();
+        }
+        super.dispose();
+    }
+
     public static void main(String[] args) {
         try {
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+            System.setProperty("awt.useSystemAAFontSettings", "on");
+            System.setProperty("swing.aatext", "true");
         } catch (Exception e) {
             e.printStackTrace();
         }
 
         SwingUtilities.invokeLater(() -> {
-            new AddPatientForm().setVisible(true);
+            AddPatientForm frame = new AddPatientForm();
+            frame.setVisible(true);
         });
     }
 }
