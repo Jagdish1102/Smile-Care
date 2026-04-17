@@ -25,9 +25,11 @@ public class AddPatientForm extends JFrame {
     private String lastSavedPatientName = null;
     private int lastSavedPatientAge = 0;
     private String lastSavedPatientGender = null;
+    private Integer lastSavedPatientId = null;
 
     // Flag to prevent multiple saves
     private volatile boolean isSaving = false;
+    private volatile boolean openPrescriptionAfterSave = false;
     private Timer statusTimer;
     private Timer successDialogTimer;
 
@@ -43,7 +45,8 @@ public class AddPatientForm extends JFrame {
         setIconImage(AppResources.getAppIcon());
 
         // Set default size
-        setSize(850, 550);
+        setSize(900, 750);
+        setMinimumSize(new Dimension(850, 700));
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setMinimumSize(new Dimension(800, 600));
@@ -95,13 +98,7 @@ public class AddPatientForm extends JFrame {
         formPanel = new JPanel(new GridBagLayout());
         formPanel.setBackground(PANEL_COLOR);
 
-        JScrollPane scrollPane = new JScrollPane(formPanel);
-        scrollPane.setBorder(null);
-        scrollPane.getViewport().setBackground(PANEL_COLOR);
-        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
-        scrollPane.getVerticalScrollBar().setUnitIncrement(20);
-        contentPanel.add(scrollPane, BorderLayout.CENTER);
+        contentPanel.add(formPanel, BorderLayout.CENTER);
 
         setupFormFields();
 
@@ -471,7 +468,7 @@ public class AddPatientForm extends JFrame {
      * This is fast and reusable - directly opens without any selection
      */
     private void openPrescriptionForLastPatient() {
-        if (lastSavedPatientName == null || lastSavedPatientName.isEmpty()) {
+        if (lastSavedPatientId == null) {
             // If no patient saved yet, try to save current form first
             int confirm = JOptionPane.showConfirmDialog(this,
                 "No patient saved yet. Would you like to save this patient first?",
@@ -480,6 +477,7 @@ public class AddPatientForm extends JFrame {
                 JOptionPane.QUESTION_MESSAGE);
             
             if (confirm == JOptionPane.YES_OPTION) {
+                openPrescriptionAfterSave = true;
                 savePatient();
             } else {
                 showError("Please save a patient first before opening prescription");
@@ -488,20 +486,7 @@ public class AddPatientForm extends JFrame {
         }
         
         // Fast open - directly create prescription form with the saved patient
-        SwingUtilities.invokeLater(() -> {
-            PrescriptionForm prescriptionForm = new PrescriptionForm();
-            
-            // Auto-select the patient in prescription form
-            for (int i = 0; i < prescriptionForm.patientBox.getItemCount(); i++) {
-                String item = prescriptionForm.patientBox.getItemAt(i);
-                if (item != null && item.startsWith(lastSavedPatientName)) {
-                    prescriptionForm.patientBox.setSelectedIndex(i);
-                    break;
-                }
-            }
-            
-            prescriptionForm.setVisible(true);
-        });
+        SwingUtilities.invokeLater(() -> new PrescriptionForm(lastSavedPatientId).setVisible(true));
     }
 
     private void setupInputValidation() {
@@ -573,6 +558,7 @@ public class AddPatientForm extends JFrame {
                     lastSavedPatientName = name;
                     lastSavedPatientAge = age;
                     lastSavedPatientGender = gender;
+                    lastSavedPatientId = PatientDAO.getLatestPatientIdByNamePhone(name, phone);
                 }
                 
                 return success;
@@ -583,6 +569,9 @@ public class AddPatientForm extends JFrame {
                 try {
                     if (get()) {
                         showSuccess("Patient registered successfully!");
+                        if (openPrescriptionAfterSave && lastSavedPatientId != null) {
+                            SwingUtilities.invokeLater(() -> new PrescriptionForm(lastSavedPatientId).setVisible(true));
+                        }
                         clearFields();
                     } else {
                         showError("Error saving patient to database");
@@ -591,6 +580,7 @@ public class AddPatientForm extends JFrame {
                     ex.printStackTrace();
                     showError("An error occurred: " + ex.getMessage());
                 } finally {
+                    openPrescriptionAfterSave = false;
                     isSaving = false;
                     saveBtn.setEnabled(true);
                 }

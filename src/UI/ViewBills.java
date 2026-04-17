@@ -73,7 +73,8 @@ public class ViewBills extends JFrame {
 	public ViewBills() {
 		setIconImage(AppResources.getAppIcon());
 		setTitle("Billing Management System");
-		setExtendedState(JFrame.MAXIMIZED_BOTH);
+		setSize(900, 750);
+		setMinimumSize(new Dimension(850, 700));
 		setLocationRelativeTo(null);
 		setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 
@@ -172,17 +173,10 @@ public class ViewBills extends JFrame {
 		table.setAutoCreateRowSorter(true);
 		table.setGridColor(BORDER_COLOR);
 		table.setSelectionBackground(new Color(184, 207, 229));
+		table.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
 		
 		// Set column widths
 		TableColumnModel columnModel = table.getColumnModel();
-		columnModel.getColumn(0).setPreferredWidth(60);
-		columnModel.getColumn(0).setMaxWidth(70);
-		columnModel.getColumn(1).setPreferredWidth(80);
-		columnModel.getColumn(2).setPreferredWidth(200);
-		columnModel.getColumn(3).setPreferredWidth(120);
-		columnModel.getColumn(4).setPreferredWidth(100);
-		columnModel.getColumn(5).setPreferredWidth(100);
-		columnModel.getColumn(6).setPreferredWidth(100);
 
 		// Set amount renderer
 		columnModel.getColumn(3).setCellRenderer(amountRenderer);
@@ -252,10 +246,7 @@ public class ViewBills extends JFrame {
 			}
 		});
 
-		JScrollPane scrollPane = new JScrollPane(table);
-		scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
-		scrollPane.setBorder(null);
-		panel.add(scrollPane, BorderLayout.CENTER);
+		panel.add(table, BorderLayout.CENTER);
 
 		return panel;
 	}
@@ -402,7 +393,6 @@ public class ViewBills extends JFrame {
 	
 	private void loadThisWeekBills() {
 		try {
-			Connection con = DBConnection.connect();
 			model.setRowCount(0);
 			
 			LocalDate today = LocalDate.now();
@@ -410,33 +400,31 @@ public class ViewBills extends JFrame {
 			
 			String sql = "SELECT id, patient_name, amount, date FROM billing WHERE DATE(date) BETWEEN ? AND ? ORDER BY id DESC";
 			
-			PreparedStatement ps = con.prepareStatement(sql);
-			ps.setString(1, startOfWeek.toString());
-			ps.setString(2, today.toString());
-			
-			ResultSet rs = ps.executeQuery();
-			
 			double total = 0;
-			
-			while (rs.next()) {
-				double amount = rs.getDouble("amount");
-				total += amount;
-				
-				String status = getStatus(amount);
-				String dateStr = rs.getString("date");
-				String timeStr = "";
-				
-				if (dateStr != null && dateStr.length() > 10) {
-					timeStr = dateStr.substring(11);
-					dateStr = dateStr.substring(0, 10);
+			try (Connection con = DBConnection.connect();
+			     PreparedStatement ps = con.prepareStatement(sql)) {
+				ps.setString(1, startOfWeek.toString());
+				ps.setString(2, today.toString());
+				try (ResultSet rs = ps.executeQuery()) {
+					while (rs.next()) {
+						double amount = rs.getDouble("amount");
+						total += amount;
+
+						String status = getStatus(amount);
+						String dateStr = rs.getString("date");
+						String timeStr = "";
+
+						if (dateStr != null && dateStr.length() > 10) {
+							timeStr = dateStr.substring(11);
+							dateStr = dateStr.substring(0, 10);
+						}
+
+						model.addRow(new Object[] { false, rs.getInt("id"), rs.getString("patient_name"), amount, dateStr,
+								timeStr, status });
+					}
 				}
-				
-				model.addRow(new Object[] { false, rs.getInt("id"), rs.getString("patient_name"), amount, dateStr,
-						timeStr, status });
 			}
-			
 			updateTotalAmount(total);
-			con.close();
 			showStatusMessage("Showing bills for this week", INFO_COLOR);
 			
 		} catch (Exception e) {
@@ -447,41 +435,37 @@ public class ViewBills extends JFrame {
 	
 	private void loadThisMonthBills() {
 		try {
-			Connection con = DBConnection.connect();
 			model.setRowCount(0);
 			
 			LocalDate today = LocalDate.now();
 			LocalDate startOfMonth = today.withDayOfMonth(1);
 			
 			String sql = "SELECT id, patient_name, amount, date FROM billing WHERE DATE(date) BETWEEN ? AND ? ORDER BY id DESC";
-			
-			PreparedStatement ps = con.prepareStatement(sql);
-			ps.setString(1, startOfMonth.toString());
-			ps.setString(2, today.toString());
-			
-			ResultSet rs = ps.executeQuery();
-			
 			double total = 0;
-			
-			while (rs.next()) {
-				double amount = rs.getDouble("amount");
-				total += amount;
-				
-				String status = getStatus(amount);
-				String dateStr = rs.getString("date");
-				String timeStr = "";
-				
-				if (dateStr != null && dateStr.length() > 10) {
-					timeStr = dateStr.substring(11);
-					dateStr = dateStr.substring(0, 10);
+			try (Connection con = DBConnection.connect();
+			     PreparedStatement ps = con.prepareStatement(sql)) {
+				ps.setString(1, startOfMonth.toString());
+				ps.setString(2, today.toString());
+				try (ResultSet rs = ps.executeQuery()) {
+					while (rs.next()) {
+						double amount = rs.getDouble("amount");
+						total += amount;
+
+						String status = getStatus(amount);
+						String dateStr = rs.getString("date");
+						String timeStr = "";
+
+						if (dateStr != null && dateStr.length() > 10) {
+							timeStr = dateStr.substring(11);
+							dateStr = dateStr.substring(0, 10);
+						}
+
+						model.addRow(new Object[] { false, rs.getInt("id"), rs.getString("patient_name"), amount, dateStr,
+								timeStr, status });
+					}
 				}
-				
-				model.addRow(new Object[] { false, rs.getInt("id"), rs.getString("patient_name"), amount, dateStr,
-						timeStr, status });
 			}
-			
 			updateTotalAmount(total);
-			con.close();
 			showStatusMessage("Showing bills for this month", INFO_COLOR);
 			
 		} catch (Exception e) {
@@ -492,38 +476,35 @@ public class ViewBills extends JFrame {
 
 	private void loadTodayBills() {
 		try {
-			Connection con = DBConnection.connect();
 			model.setRowCount(0);
 
 			String today = LocalDate.now().toString();
 			String sql = "SELECT id, patient_name, amount, date FROM billing WHERE DATE(date) = ? ORDER BY id DESC";
 
-			PreparedStatement ps = con.prepareStatement(sql);
-			ps.setString(1, today);
-
-			ResultSet rs = ps.executeQuery();
-
 			double total = 0;
+			try (Connection con = DBConnection.connect();
+			     PreparedStatement ps = con.prepareStatement(sql)) {
+				ps.setString(1, today);
+				try (ResultSet rs = ps.executeQuery()) {
+					while (rs.next()) {
+						double amount = rs.getDouble("amount");
+						total += amount;
 
-			while (rs.next()) {
-				double amount = rs.getDouble("amount");
-				total += amount;
+						String status = getStatus(amount);
+						String dateStr = rs.getString("date");
+						String timeStr = "";
 
-				String status = getStatus(amount);
-				String dateStr = rs.getString("date");
-				String timeStr = "";
+						if (dateStr != null && dateStr.length() > 10) {
+							timeStr = dateStr.substring(11);
+							dateStr = dateStr.substring(0, 10);
+						}
 
-				if (dateStr != null && dateStr.length() > 10) {
-					timeStr = dateStr.substring(11);
-					dateStr = dateStr.substring(0, 10);
+						model.addRow(new Object[] { false, rs.getInt("id"), rs.getString("patient_name"), amount, dateStr,
+								timeStr, status });
+					}
 				}
-
-				model.addRow(new Object[] { false, rs.getInt("id"), rs.getString("patient_name"), amount, dateStr,
-						timeStr, status });
 			}
-
 			updateTotalAmount(total);
-			con.close();
 			showStatusMessage("Showing today's bills", INFO_COLOR);
 
 		} catch (Exception e) {
@@ -543,7 +524,6 @@ public class ViewBills extends JFrame {
 
 	private void loadBills(String keyword) {
 	    try {
-	        Connection con = DBConnection.connect();
 	        model.setRowCount(0);
 
 	        String sql = "SELECT id, patient_name, amount, date FROM billing "
@@ -551,42 +531,39 @@ public class ViewBills extends JFrame {
 	                   + "OR CAST(id AS CHAR) LIKE ? "
 	                   + "ORDER BY id DESC";
 
-	        PreparedStatement ps = con.prepareStatement(sql);
-	        String search = "%" + keyword + "%";
-	        ps.setString(1, search);
-	        ps.setString(2, search);
-
-	        ResultSet rs = ps.executeQuery();
-
 	        double total = 0;
+	        try (Connection con = DBConnection.connect();
+	             PreparedStatement ps = con.prepareStatement(sql)) {
+	            String search = "%" + keyword + "%";
+	            ps.setString(1, search);
+	            ps.setString(2, search);
+	            try (ResultSet rs = ps.executeQuery()) {
+	                while (rs.next()) {
+	                    double amount = rs.getDouble("amount");
+	                    total += amount;
 
-	        while (rs.next()) {
-	            double amount = rs.getDouble("amount");
-	            total += amount;
+	                    String status = getStatus(amount);
+	                    String dateStr = rs.getString("date");
+	                    String timeStr = "";
 
-	            String status = getStatus(amount);
-	            String dateStr = rs.getString("date");
-	            String timeStr = "";
+	                    if (dateStr != null && dateStr.length() > 10) {
+	                        timeStr = dateStr.substring(11);
+	                        dateStr = dateStr.substring(0, 10);
+	                    }
 
-	            if (dateStr != null && dateStr.length() > 10) {
-	                timeStr = dateStr.substring(11);
-	                dateStr = dateStr.substring(0, 10);
+	                    model.addRow(new Object[]{
+	                            false,
+	                            rs.getInt("id"),
+	                            rs.getString("patient_name"),
+	                            amount,
+	                            dateStr,
+	                            timeStr,
+	                            status
+	                    });
+	                }
 	            }
-
-	            model.addRow(new Object[]{
-	                    false,
-	                    rs.getInt("id"),
-	                    rs.getString("patient_name"),
-	                    amount,
-	                    dateStr,
-	                    timeStr,
-	                    status
-	            });
 	        }
-
 	        updateTotalAmount(total);
-	        con.close();
-
 	    } catch (Exception e) {
 	        e.printStackTrace();
 	        showStatusMessage("Error loading bills", DANGER_COLOR);
@@ -677,20 +654,35 @@ public class ViewBills extends JFrame {
 	
 	private void exportBillsByDate(String fromDate, String toDate) {
 	    try {
-	        Connection con = DBConnection.connect();
-	        
 	        String sql = "SELECT id, patient_name, amount, date FROM billing WHERE DATE(date) BETWEEN ? AND ? ORDER BY date DESC";
-	        
-	        PreparedStatement ps = con.prepareStatement(sql);
-	        ps.setString(1, fromDate);
-	        ps.setString(2, toDate);
-	        
-	        ResultSet rs = ps.executeQuery();
-	        
-	        // Check if there are results
-	        if (!rs.isBeforeFirst()) {
+	        List<Object[]> rows = new ArrayList<>();
+	        double totalAmount = 0;
+	        try (Connection con = DBConnection.connect();
+	             PreparedStatement ps = con.prepareStatement(sql)) {
+	            ps.setString(1, fromDate);
+	            ps.setString(2, toDate);
+	            try (ResultSet rs = ps.executeQuery()) {
+	                while (rs.next()) {
+	                    int id = rs.getInt("id");
+	                    String name = rs.getString("patient_name");
+	                    double amount = rs.getDouble("amount");
+	                    totalAmount += amount;
+
+	                    String dateTime = rs.getString("date");
+	                    String datePart = "";
+	                    String timePart = "";
+	                    if (dateTime != null && dateTime.length() > 10) {
+	                        datePart = dateTime.substring(0, 10);
+	                        timePart = dateTime.substring(11);
+	                    } else {
+	                        datePart = dateTime;
+	                    }
+	                    rows.add(new Object[] {id, name, amount, datePart, timePart});
+	                }
+	            }
+	        }
+	        if (rows.isEmpty()) {
 	            showStatusMessage("No bills found for the selected date range", WARNING_COLOR);
-	            con.close();
 	            return;
 	        }
 	        
@@ -702,7 +694,6 @@ public class ViewBills extends JFrame {
 	        int option = chooser.showSaveDialog(this);
 	        
 	        if (option != JFileChooser.APPROVE_OPTION) {
-	            con.close();
 	            return;
 	        }
 	        
@@ -711,121 +702,83 @@ public class ViewBills extends JFrame {
 	            file = new File(file.getAbsolutePath() + ".xlsx");
 	        }
 	        
-	        // Create Excel workbook
-	        Workbook workbook = new XSSFWorkbook();
-	        Sheet sheet = workbook.createSheet("Bills Report");
-	        
-	        // Create header style
-	        CellStyle headerStyle = workbook.createCellStyle();
-	        org.apache.poi.ss.usermodel.Font headerFont = workbook.createFont();
-	        headerFont.setBold(true);
-	        headerFont.setFontHeightInPoints((short) 12);
-	        headerStyle.setFont(headerFont);
-	        headerStyle.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
-	        headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-	        headerStyle.setBorderBottom(BorderStyle.THIN);
-	        headerStyle.setBorderTop(BorderStyle.THIN);
-	        headerStyle.setBorderLeft(BorderStyle.THIN);
-	        headerStyle.setBorderRight(BorderStyle.THIN);
-	        headerStyle.setAlignment(HorizontalAlignment.CENTER);
-	        
-	        // Create data style
-	        CellStyle dataStyle = workbook.createCellStyle();
-	        dataStyle.setBorderBottom(BorderStyle.THIN);
-	        dataStyle.setBorderTop(BorderStyle.THIN);
-	        dataStyle.setBorderLeft(BorderStyle.THIN);
-	        dataStyle.setBorderRight(BorderStyle.THIN);
-	        dataStyle.setAlignment(HorizontalAlignment.LEFT);
-	        
-	        // Create currency style
-	        CellStyle currencyStyle = workbook.createCellStyle();
-	        currencyStyle.setBorderBottom(BorderStyle.THIN);
-	        currencyStyle.setBorderTop(BorderStyle.THIN);
-	        currencyStyle.setBorderLeft(BorderStyle.THIN);
-	        currencyStyle.setBorderRight(BorderStyle.THIN);
-	        currencyStyle.setDataFormat(workbook.createDataFormat().getFormat("₹#,##0.00"));
-	        currencyStyle.setAlignment(HorizontalAlignment.RIGHT);
-	        
-	        // Create header row
-	        Row headerRow = sheet.createRow(0);
-	        String[] columns = {"Bill ID", "Patient Name", "Amount (₹)", "Date", "Time"};
-	        
-	        for (int i = 0; i < columns.length; i++) {
-	            Cell cell = headerRow.createCell(i);
-	            cell.setCellValue(columns[i]);
-	            cell.setCellStyle(headerStyle);
-	        }
-	        
 	        int rowIndex = 1;
-	        double totalAmount = 0;
-	        
-	        while (rs.next()) {
-	            Row row = sheet.createRow(rowIndex++);
-	            
-	            int id = rs.getInt("id");
-	            String name = rs.getString("patient_name");
-	            double amount = rs.getDouble("amount");
-	            totalAmount += amount;
-	            
-	            String dateTime = rs.getString("date");
-	            String datePart = "";
-	            String timePart = "";
-	            
-	            if (dateTime != null && dateTime.length() > 10) {
-	                datePart = dateTime.substring(0, 10);
-	                timePart = dateTime.substring(11);
-	            } else {
-	                datePart = dateTime;
+	        try (Workbook workbook = new XSSFWorkbook();
+	             FileOutputStream fos = new FileOutputStream(file)) {
+	            Sheet sheet = workbook.createSheet("Bills Report");
+	            CellStyle headerStyle = workbook.createCellStyle();
+	            org.apache.poi.ss.usermodel.Font headerFont = workbook.createFont();
+	            headerFont.setBold(true);
+	            headerFont.setFontHeightInPoints((short) 12);
+	            headerStyle.setFont(headerFont);
+	            headerStyle.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
+	            headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+	            headerStyle.setBorderBottom(BorderStyle.THIN);
+	            headerStyle.setBorderTop(BorderStyle.THIN);
+	            headerStyle.setBorderLeft(BorderStyle.THIN);
+	            headerStyle.setBorderRight(BorderStyle.THIN);
+	            headerStyle.setAlignment(HorizontalAlignment.CENTER);
+
+	            CellStyle dataStyle = workbook.createCellStyle();
+	            dataStyle.setBorderBottom(BorderStyle.THIN);
+	            dataStyle.setBorderTop(BorderStyle.THIN);
+	            dataStyle.setBorderLeft(BorderStyle.THIN);
+	            dataStyle.setBorderRight(BorderStyle.THIN);
+	            dataStyle.setAlignment(HorizontalAlignment.LEFT);
+
+	            CellStyle currencyStyle = workbook.createCellStyle();
+	            currencyStyle.setBorderBottom(BorderStyle.THIN);
+	            currencyStyle.setBorderTop(BorderStyle.THIN);
+	            currencyStyle.setBorderLeft(BorderStyle.THIN);
+	            currencyStyle.setBorderRight(BorderStyle.THIN);
+	            currencyStyle.setDataFormat(workbook.createDataFormat().getFormat("₹#,##0.00"));
+	            currencyStyle.setAlignment(HorizontalAlignment.RIGHT);
+
+	            Row headerRow = sheet.createRow(0);
+	            String[] columns = {"Bill ID", "Patient Name", "Amount (₹)", "Date", "Time"};
+	            for (int i = 0; i < columns.length; i++) {
+	                Cell cell = headerRow.createCell(i);
+	                cell.setCellValue(columns[i]);
+	                cell.setCellStyle(headerStyle);
 	            }
-	            
-	            Cell idCell = row.createCell(0);
-	            idCell.setCellValue(id);
-	            idCell.setCellStyle(dataStyle);
-	            
-	            Cell nameCell = row.createCell(1);
-	            nameCell.setCellValue(name);
-	            nameCell.setCellStyle(dataStyle);
-	            
-	            Cell amountCell = row.createCell(2);
-	            amountCell.setCellValue(amount);
-	            amountCell.setCellStyle(currencyStyle);
-	            
-	            Cell dateCell = row.createCell(3);
-	            dateCell.setCellValue(datePart);
-	            dateCell.setCellStyle(dataStyle);
-	            
-	            Cell timeCell = row.createCell(4);
-	            timeCell.setCellValue(timePart);
-	            timeCell.setCellStyle(dataStyle);
+
+	            for (Object[] data : rows) {
+	                Row row = sheet.createRow(rowIndex++);
+	                Cell idCell = row.createCell(0);
+	                idCell.setCellValue((Integer) data[0]);
+	                idCell.setCellStyle(dataStyle);
+	                Cell nameCell = row.createCell(1);
+	                nameCell.setCellValue((String) data[1]);
+	                nameCell.setCellStyle(dataStyle);
+	                Cell amountCell = row.createCell(2);
+	                amountCell.setCellValue((Double) data[2]);
+	                amountCell.setCellStyle(currencyStyle);
+	                Cell dateCell = row.createCell(3);
+	                dateCell.setCellValue((String) data[3]);
+	                dateCell.setCellStyle(dataStyle);
+	                Cell timeCell = row.createCell(4);
+	                timeCell.setCellValue((String) data[4]);
+	                timeCell.setCellStyle(dataStyle);
+	            }
+
+	            Row totalRow = sheet.createRow(rowIndex);
+	            Cell totalLabelCell = totalRow.createCell(1);
+	            totalLabelCell.setCellValue("GRAND TOTAL");
+	            totalLabelCell.setCellStyle(headerStyle);
+	            Cell totalAmountCell = totalRow.createCell(2);
+	            totalAmountCell.setCellValue(totalAmount);
+	            totalAmountCell.setCellStyle(currencyStyle);
+
+	            for (int i = 0; i < columns.length; i++) {
+	                sheet.autoSizeColumn(i);
+	            }
+	            workbook.write(fos);
 	        }
-	        
-	        // Add total row
-	        Row totalRow = sheet.createRow(rowIndex);
-	        Cell totalLabelCell = totalRow.createCell(1);
-	        totalLabelCell.setCellValue("GRAND TOTAL");
-	        totalLabelCell.setCellStyle(headerStyle);
-	        
-	        Cell totalAmountCell = totalRow.createCell(2);
-	        totalAmountCell.setCellValue(totalAmount);
-	        totalAmountCell.setCellStyle(currencyStyle);
-	        
-	        // Auto-size columns
-	        for (int i = 0; i < columns.length; i++) {
-	            sheet.autoSizeColumn(i);
-	        }
-	        
-	        // Write to file
-	        FileOutputStream fos = new FileOutputStream(file);
-	        workbook.write(fos);
-	        fos.close();
-	        workbook.close();
-	        
-	        con.close();
 	        
 	        JOptionPane.showMessageDialog(
 	                this,
 	                String.format("Export Successful!\n\nFile: %s\nRecords: %d\nTotal Amount: ₹%.2f",
-	                    file.getName(), rowIndex - 1, totalAmount),
+	                    file.getName(), rows.size(), totalAmount),
 	                "Export Complete",
 	                JOptionPane.INFORMATION_MESSAGE
 	        );
@@ -858,7 +811,7 @@ public class ViewBills extends JFrame {
 
 			NumberFormat currencyFormat = NumberFormat.getCurrencyInstance(new Locale("en", "IN"));
 
-			JTextArea details = new JTextArea();
+			JTextArea details = new JTextArea(10, 40);
 			details.setEditable(false);
 			details.setFont(new Font("Monospaced", Font.PLAIN, 12));
 			details.setText(String.format(
@@ -874,10 +827,7 @@ public class ViewBills extends JFrame {
 					"═══════════════════════════════════",
 					id, name, currencyFormat.format(amount), date, time, status));
 
-			JScrollPane scrollPane = new JScrollPane(details);
-			scrollPane.setPreferredSize(new Dimension(400, 300));
-
-			JOptionPane.showMessageDialog(this, scrollPane, "Bill Details", JOptionPane.INFORMATION_MESSAGE);
+			JOptionPane.showMessageDialog(this, details, "Bill Details", JOptionPane.INFORMATION_MESSAGE);
 
 		} catch (Exception e) {
 			showStatusMessage("Error viewing bill details", DANGER_COLOR);
@@ -974,30 +924,26 @@ public class ViewBills extends JFrame {
 			protected Boolean doInBackground() throws Exception {
 				int successCount = 0;
 				Connection con = null;
-
 				try {
 					con = DBConnection.connect();
 					con.setAutoCommit(false);
-
-					PreparedStatement ps = con.prepareStatement("DELETE FROM billing WHERE id = ?");
-
-					for (int id : selectedIds) {
-						ps.setInt(1, id);
-						int affected = ps.executeUpdate();
-						if (affected > 0)
-							successCount++;
+					try (PreparedStatement ps = con.prepareStatement("DELETE FROM billing WHERE id = ?")) {
+						for (int id : selectedIds) {
+							ps.setInt(1, id);
+							int affected = ps.executeUpdate();
+							if (affected > 0)
+								successCount++;
+						}
 					}
 
 					con.commit();
 					return successCount > 0;
 
 				} catch (Exception e) {
-					if (con != null)
-						con.rollback();
+					if (con != null) con.rollback();
 					throw e;
 				} finally {
-					if (con != null)
-						con.close();
+					if (con != null) con.close();
 				}
 			}
 

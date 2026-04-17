@@ -17,12 +17,10 @@ public class Dashboard extends JFrame {
 
 		setTitle("Smile Care Clinic - Dashboard");
 		setIconImage(AppResources.getAppIcon());
-		setExtendedState(JFrame.MAXIMIZED_BOTH);
+		setSize(900, 750);
+		setMinimumSize(new Dimension(850, 700));
 		setLocationRelativeTo(null);
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-
-		// Set minimum size
-		setMinimumSize(new Dimension(1024, 768));
 
 		// 🔷 Main Panel with gradient background
 		mainPanel = new JPanel() {
@@ -109,6 +107,7 @@ public class Dashboard extends JFrame {
 		JButton medicineBtn = createEnhancedButton("Manage Medicines", btnFont, btnSize, new Color(230, 126, 34));
 		JButton logoutBtn = createEnhancedButton("Logout", btnFont, btnSize, new Color(231, 76, 60));
 		JButton generateBtn = createEnhancedButton("Generate", btnFont, btnSize, new Color(26, 188, 156));
+		JButton changeYearBtn = new JButton("Change Year");
 
 		// Add buttons to grid
 		gridPanel.add(addPatientBtn);
@@ -168,24 +167,7 @@ public class Dashboard extends JFrame {
 		});
 		
 		generateBtn.addActionListener(e -> {
-		    String[] options = {"Leave Application", "Quotation"};
-
-		    int choice = JOptionPane.showOptionDialog(
-		            this,
-		            "Select what you want to generate:",
-		            "Generate",
-		            JOptionPane.DEFAULT_OPTION,
-		            JOptionPane.INFORMATION_MESSAGE,
-		            null,
-		            options,
-		            options[0]
-		    );
-
-		    if (choice == 0) {
-		        JOptionPane.showMessageDialog(this, "Leave Application Form Coming Soon");
-		    } else if (choice == 1) {
-		        JOptionPane.showMessageDialog(this, "Quotation Form Coming Soon");
-		    }
+		    new GenerateForms(this).setVisible(true);
 		});
 		logoutBtn.addActionListener(e -> {
 
@@ -211,7 +193,27 @@ public class Dashboard extends JFrame {
 				});
 			}
 		});
+		
+		changeYearBtn.addActionListener(e -> {
+		    Integer[] years = {2026, 2027, 2028};
+
+		    Integer selected = (Integer) JOptionPane.showInputDialog(
+		            this,
+		            "Select Year",
+		            "Change Year",
+		            JOptionPane.PLAIN_MESSAGE,
+		            null,
+		            years,
+		            SessionManager.getYear()
+		    );
+
+		    if (selected != null) {
+		        SessionManager.setYear(selected);
+		        JOptionPane.showMessageDialog(this, "Year Changed to " + selected);
+		    }
+		});
 	}
+	
 
 	// 🔹 Create enhanced button with gradient and hover effects
 	private JButton createEnhancedButton(String text, Font font, Dimension size, Color baseColor) {

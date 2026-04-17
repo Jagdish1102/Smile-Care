@@ -1,6 +1,7 @@
 package dhule_Hospital_database;
 
 import java.sql.Connection;
+import java.sql.SQLException;
 import java.sql.Statement;
 
 public class CreateTable {
@@ -24,7 +25,7 @@ public class CreateTable {
             stmt.execute(sql);
             System.out.println("Patients table created");
 
-        } catch (Exception e) {
+        } catch (SQLException e) {
             e.printStackTrace();
         }
     }

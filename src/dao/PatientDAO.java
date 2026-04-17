@@ -5,9 +5,14 @@ import model.Patient;
 
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class PatientDAO {
+    private static final Set<String> ALLOWED_SORT_COLUMNS = new HashSet<>(
+            Arrays.asList("id", "name", "age", "gender", "phone", "date"));
 
     // ================= COMMON MAPPER =================
     private static Patient mapRow(ResultSet rs) throws SQLException {
@@ -46,7 +51,7 @@ public class PatientDAO {
             ps.executeUpdate();
             return true;
 
-        } catch (Exception e) {
+        } catch (SQLException e) {
             System.err.println("Error adding patient: " + e.getMessage());
             return false;
         }
@@ -66,7 +71,7 @@ public class PatientDAO {
                 list.add(mapRow(rs));
             }
 
-        } catch (Exception e) {
+        } catch (SQLException e) {
             System.err.println("Error fetching patients: " + e.getMessage());
         }
 
@@ -85,7 +90,7 @@ public class PatientDAO {
             ps.executeUpdate();
             return true;
 
-        } catch (Exception e) {
+        } catch (SQLException e) {
             System.err.println("Error deleting patient: " + e.getMessage());
             return false;
         }
@@ -110,7 +115,7 @@ public class PatientDAO {
             ps.executeUpdate();
             return true;
 
-        } catch (Exception e) {
+        } catch (SQLException e) {
             System.err.println("Error updating patient: " + e.getMessage());
             return false;
         }
@@ -125,13 +130,13 @@ public class PatientDAO {
              PreparedStatement ps = con.prepareStatement(sql)) {
 
             ps.setInt(1, id);
-            ResultSet rs = ps.executeQuery();
-
-            if (rs.next()) {
-                return mapRow(rs);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return mapRow(rs);
+                }
             }
 
-        } catch (Exception e) {
+        } catch (SQLException e) {
             System.err.println("Error fetching patient by ID: " + e.getMessage());
         }
 
@@ -143,7 +148,7 @@ public class PatientDAO {
 
         List<Patient> list = new ArrayList<>();
 
-        String sql = "SELECT * FROM patients WHERE name LIKE ? OR surname LIKE ? OR phone LIKE ?";
+        String sql = "SELECT * FROM patients WHERE name LIKE ? OR surname LIKE ? OR phone LIKE ? ORDER BY date DESC";
 
         try (Connection con = DBConnection.connect();
              PreparedStatement ps = con.prepareStatement(sql)) {
@@ -154,13 +159,13 @@ public class PatientDAO {
             ps.setString(2, pattern);
             ps.setString(3, pattern);
 
-            ResultSet rs = ps.executeQuery();
-
-            while (rs.next()) {
-                list.add(mapRow(rs));
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    list.add(mapRow(rs));
+                }
             }
 
-        } catch (Exception e) {
+        } catch (SQLException e) {
             System.err.println("Error searching patients: " + e.getMessage());
         }
 
@@ -172,7 +177,8 @@ public class PatientDAO {
 
         List<Patient> list = new ArrayList<>();
 
-        String sql = "SELECT * FROM patients ORDER BY " + column + " DESC";
+        String safeColumn = ALLOWED_SORT_COLUMNS.contains(column) ? column : "date";
+        String sql = "SELECT * FROM patients ORDER BY " + safeColumn + " DESC";
 
         try (Connection con = DBConnection.connect();
              Statement st = con.createStatement();
@@ -182,11 +188,24 @@ public class PatientDAO {
                 list.add(mapRow(rs));
             }
 
-        } catch (Exception e) {
+        } catch (SQLException e) {
             System.err.println("Error sorting patients: " + e.getMessage());
         }
 
         return list;
+    }
+
+    // ================= SORT HELPERS (LEGACY UI COMPATIBILITY) =================
+    public static List<Patient> getPatientsSortedByDate() {
+        return getPatientsSorted("date");
+    }
+
+    public static List<Patient> getPatientsSortedByName() {
+        return getPatientsSorted("name");
+    }
+
+    public static List<Patient> getPatientsSortedByAge() {
+        return getPatientsSorted("age");
     }
 
     // ================= TODAY PATIENTS =================
@@ -201,13 +220,13 @@ public class PatientDAO {
              PreparedStatement ps = con.prepareStatement(sql)) {
 
             ps.setString(1, today);
-            ResultSet rs = ps.executeQuery();
-
-            while (rs.next()) {
-                list.add(mapRow(rs));
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    list.add(mapRow(rs));
+                }
             }
 
-        } catch (Exception e) {
+        } catch (SQLException e) {
             System.err.println("Error fetching today's patients: " + e.getMessage());
         }
 
@@ -227,16 +246,33 @@ public class PatientDAO {
             ps.setString(1, fromDate);
             ps.setString(2, toDate);
 
-            ResultSet rs = ps.executeQuery();
-
-            while (rs.next()) {
-                list.add(mapRow(rs));
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    list.add(mapRow(rs));
+                }
             }
 
-        } catch (Exception e) {
+        } catch (SQLException e) {
             System.err.println("Error fetching patients by date range: " + e.getMessage());
         }
 
         return list;
+    }
+
+    public static Integer getLatestPatientIdByNamePhone(String name, String phone) {
+        String sql = "SELECT id FROM patients WHERE name=? AND phone=? ORDER BY id DESC LIMIT 1";
+        try (Connection con = DBConnection.connect();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setString(1, name);
+            ps.setString(2, phone == null ? "" : phone);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt("id");
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("Error finding latest patient id: " + e.getMessage());
+        }
+        return null;
     }
 }

@@ -8,6 +8,8 @@ import javax.swing.table.JTableHeader;
 import javax.swing.table.TableRowSorter;
 import java.awt.*;
 import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
 
 public class PrescriptionHistory extends JFrame {
 
@@ -139,47 +141,59 @@ public class PrescriptionHistory extends JFrame {
 		refreshBtn.addActionListener(e -> {
 
 			model.setRowCount(0);
-			loadPrescriptions(patientName);
+			loadPrescriptionsAsync(patientName);
 
 		});
 
 		printBtn.addActionListener(e -> printTable());
 
 		// 🔷 LOAD DATA
-		loadPrescriptions(patientName);
+		loadPrescriptionsAsync(patientName);
 
 		setVisible(true);
 	}
 
-	private void loadPrescriptions(String patientName) {
-
-		try {
-
-			Connection con = DBConnection.connect();
-
-			String sql = "SELECT medicines, notes, date FROM prescriptions WHERE patient_name=? ORDER BY date DESC";
-
-			PreparedStatement ps = con.prepareStatement(sql);
+	private List<Object[]> fetchPrescriptions(String patientName) {
+		List<Object[]> rows = new ArrayList<>();
+		String sql = "SELECT medicines, COALESCE(advice, notes, '') AS advice_text, date FROM prescriptions WHERE patient_name=? ORDER BY date DESC";
+		try (Connection con = DBConnection.connect();
+		     PreparedStatement ps = con.prepareStatement(sql)) {
 			ps.setString(1, patientName);
-
-			ResultSet rs = ps.executeQuery();
-
-			while (rs.next()) {
-
-				String date = rs.getString("date");
-				String med = rs.getString("medicines");
-				String advice = rs.getString("notes");
-
-				model.addRow(new Object[] { date, med, advice });
+			try (ResultSet rs = ps.executeQuery()) {
+				while (rs.next()) {
+					String date = rs.getString("date");
+					String med = rs.getString("medicines");
+					String advice = rs.getString("advice_text");
+					rows.add(new Object[] { date, med, advice });
+				}
 			}
-
-			countLabel.setText("Total Prescriptions: " + model.getRowCount());
-
-			con.close();
-
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+		return rows;
+	}
+
+	private void loadPrescriptionsAsync(String patientName) {
+		new SwingWorker<List<Object[]>, Void>() {
+			@Override
+			protected List<Object[]> doInBackground() {
+				return fetchPrescriptions(patientName);
+			}
+
+			@Override
+			protected void done() {
+				model.setRowCount(0);
+				try {
+					List<Object[]> rows = get();
+					for (Object[] row : rows) {
+						model.addRow(row);
+					}
+					countLabel.setText("Total Prescriptions: " + model.getRowCount());
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+			}
+		}.execute();
 	}
 
 	private void printTable() {
