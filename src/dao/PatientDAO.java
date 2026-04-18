@@ -275,4 +275,81 @@ public class PatientDAO {
         }
         return null;
     }
+ // ================= ID RANGE =================
+    public static List<Patient> getPatientsByIdRange(int from, int to) {
+
+        List<Patient> list = new ArrayList<>();
+        String sql = "SELECT * FROM patients WHERE id BETWEEN ? AND ? ORDER BY id DESC";
+
+        try (Connection con = DBConnection.connect();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setInt(1, from);
+            ps.setInt(2, to);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    list.add(mapRow(rs));
+                }
+            }
+
+        } catch (SQLException e) {
+            System.err.println("Error fetching patients by ID range: " + e.getMessage());
+        }
+
+        return list;
+    }
+ // ================= AGE RANGE =================
+    public static List<Patient> getPatientsByAgeRange(int from, int to) {
+
+        List<Patient> list = new ArrayList<>();
+        String sql = "SELECT * FROM patients WHERE age BETWEEN ? AND ? ORDER BY age DESC";
+
+        try (Connection con = DBConnection.connect();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setInt(1, from);
+            ps.setInt(2, to);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    list.add(mapRow(rs));
+                }
+            }
+
+        } catch (SQLException e) {
+            System.err.println("Error fetching patients by age range: " + e.getMessage());
+        }
+
+        return list;
+    }
+ // ================= DATE RANGE =================
+    public static List<Patient> getPatientsByDateRange1(String fromDate, String toDate) {
+
+        List<Patient> list = new ArrayList<>();
+
+        if (fromDate == null || toDate == null || fromDate.isEmpty() || toDate.isEmpty()) {
+            return list;
+        }
+
+        String sql = "SELECT * FROM patients WHERE date BETWEEN ? AND ? ORDER BY date DESC";
+
+        try (Connection con = DBConnection.connect();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setString(1, fromDate);
+            ps.setString(2, toDate);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    list.add(mapRow(rs));
+                }
+            }
+
+        } catch (SQLException e) {
+            System.err.println("Error fetching patients by date range: " + e.getMessage());
+        }
+
+        return list;
+    }
 }

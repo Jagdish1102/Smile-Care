@@ -765,14 +765,242 @@ public class ViewPatients extends JFrame {
     //  SORT
     // ══════════════════════════════════════════════════════════════════
     private void showSortDialog() {
-        String[] opts = {"Sort by Age","Sort by Date","Sort by Name"};
-        int choice = JOptionPane.showOptionDialog(this, "Select sorting option", "Sort Patients",
-                JOptionPane.DEFAULT_OPTION, JOptionPane.INFORMATION_MESSAGE, null, opts, opts[0]);
-        if (choice == 0) { loadPatientsSortedByAge();  showStatusMessage("Sorted by age",  SUCCESS_COLOR); }
-        else if (choice == 1) { loadPatientsSortedByDate(); showStatusMessage("Sorted by date", SUCCESS_COLOR); }
-        else if (choice == 2) { loadPatientsSortedByName(); showStatusMessage("Sorted by name", SUCCESS_COLOR); }
-    }
 
+        String[] options = {
+                "Sort by Age",
+                "Sort by Date",
+                "Sort by Name",
+                "ID Range",
+                "Age Range",
+                "Date Range"
+        };
+
+        int choice = JOptionPane.showOptionDialog(
+                this,
+                "Select sorting / filter option",
+                "Sort Patients",
+                JOptionPane.DEFAULT_OPTION,
+                JOptionPane.INFORMATION_MESSAGE,
+                null,
+                options,
+                options[0]
+        );
+
+        switch (choice) {
+            case 0:
+                loadPatientsSortedByAge();
+                showStatusMessage("Sorted by age", SUCCESS_COLOR);
+                break;
+
+            case 1:
+                loadPatientsSortedByDate();
+                showStatusMessage("Sorted by date", SUCCESS_COLOR);
+                break;
+
+            case 2:
+                loadPatientsSortedByName();
+                showStatusMessage("Sorted by name", SUCCESS_COLOR);
+                break;
+
+            case 3:
+                showIdRangeDialog();
+                break;
+
+            case 4:
+                showAgeRangeDialog();
+                break;
+
+            case 5:
+                showDateRangeDialog(); // already exists in your code
+                break;
+        }
+    }
+    
+    private void showDateRangeDialog() {
+
+        // ✅ Default values
+        String today = LocalDate.now().toString();
+        String last30Days = LocalDate.now().minusDays(30).toString();
+
+        JTextField fromField = new JTextField(last30Days);
+        JTextField toField = new JTextField(today);
+
+        JPanel panel = new JPanel(new GridLayout(2, 2, 10, 10));
+        panel.add(new JLabel("From Date (YYYY-MM-DD):"));
+        panel.add(fromField);
+        panel.add(new JLabel("To Date (YYYY-MM-DD):"));
+        panel.add(toField);
+
+        int result = JOptionPane.showConfirmDialog(
+                this,
+                panel,
+                "Filter by Date Range",
+                JOptionPane.OK_CANCEL_OPTION
+        );
+
+        if (result == JOptionPane.OK_OPTION) {
+
+            String from = fromField.getText().trim();
+            String to = toField.getText().trim();
+
+            // ✅ Validation
+            if (from.isEmpty() || to.isEmpty()) {
+                showStatusMessage("Please enter both dates", WARNING_COLOR);
+                return;
+            }
+
+            loadPatientsByDateRange(from, to);
+        }
+    }
+    private void showIdRangeDialog() {
+
+        JTextField fromField = new JTextField();
+        JTextField toField = new JTextField();
+
+        JPanel panel = new JPanel(new GridLayout(2, 2, 10, 10));
+        panel.add(new JLabel("From ID:"));
+        panel.add(fromField);
+        panel.add(new JLabel("To ID:"));
+        panel.add(toField);
+
+        int result = JOptionPane.showConfirmDialog(
+                this,
+                panel,
+                "Filter by ID Range",
+                JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.PLAIN_MESSAGE
+        );
+
+        if (result == JOptionPane.OK_OPTION) {
+            try {
+                int from = Integer.parseInt(fromField.getText().trim());
+                int to = Integer.parseInt(toField.getText().trim());
+
+                // ✅ Validation
+                if (from > to) {
+                    showStatusMessage("From ID should be less than To ID", WARNING_COLOR);
+                    return;
+                }
+
+                loadPatientsByIdRange(from, to);
+
+            } catch (NumberFormatException e) {
+                showStatusMessage("Invalid ID values", DANGER_COLOR);
+            }
+        }
+    }
+    private void showAgeRangeDialog() {
+
+        JTextField fromField = new JTextField();
+        JTextField toField = new JTextField();
+
+        JPanel panel = new JPanel(new GridLayout(2, 2, 10, 10));
+        panel.add(new JLabel("From Age:"));
+        panel.add(fromField);
+        panel.add(new JLabel("To Age:"));
+        panel.add(toField);
+
+        int result = JOptionPane.showConfirmDialog(
+                this,
+                panel,
+                "Filter by Age Range",
+                JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.PLAIN_MESSAGE
+        );
+
+        if (result == JOptionPane.OK_OPTION) {
+            try {
+                int from = Integer.parseInt(fromField.getText().trim());
+                int to = Integer.parseInt(toField.getText().trim());
+
+                // ✅ Validation
+                if (from > to) {
+                    showStatusMessage("From age should be less than To age", WARNING_COLOR);
+                    return;
+                }
+
+                loadPatientsByAgeRange(from, to);
+
+            } catch (NumberFormatException e) {
+                showStatusMessage("Invalid age values", DANGER_COLOR);
+            }
+        }
+    }
+    private void loadPatientsByIdRange(int from, int to) {
+        try {
+            model.setRowCount(0);
+
+            List<Patient> list = PatientDAO.getPatientsByIdRange(from, to);
+
+            for (Patient p : list) {
+                model.addRow(new Object[]{
+                        false,
+                        p.getId(),
+                        p.getName(),
+                        p.getAge(),
+                        p.getGender(),
+                        p.getPhone(),
+                        p.getDisease(),
+                        p.getDate()
+                });
+            }
+
+            showStatusMessage("Filtered by ID range (" + from + " - " + to + ")", SUCCESS_COLOR);
+
+        } catch (Exception e) {
+            showStatusMessage(e.getMessage(), DANGER_COLOR);
+        }
+    }
+    private void loadPatientsByAgeRange(int from, int to) {
+        try {
+            model.setRowCount(0);
+
+            List<Patient> list = PatientDAO.getPatientsByAgeRange(from, to);
+
+            for (Patient p : list) {
+                model.addRow(new Object[]{
+                        false,
+                        p.getId(),
+                        p.getName(),
+                        p.getAge(),
+                        p.getGender(),
+                        p.getPhone(),
+                        p.getDisease(),
+                        p.getDate()
+                });
+            }
+
+            showStatusMessage("Filtered by age range (" + from + " - " + to + ")", SUCCESS_COLOR);
+
+        } catch (Exception e) {
+            showStatusMessage(e.getMessage(), DANGER_COLOR);
+        }
+    }
+    private void loadPatientsByDateRange(String from, String to) {
+        try {
+            model.setRowCount(0);
+
+            List<Patient> list = PatientDAO.getPatientsByDateRange(from, to);
+
+            for (Patient p : list) {
+                model.addRow(new Object[]{
+                        false,
+                        p.getId(),
+                        p.getName(),
+                        p.getAge(),
+                        p.getGender(),
+                        p.getPhone(),
+                        p.getDisease(),
+                        p.getDate()
+                });
+            }
+
+            showStatusMessage("Filtered by date range (" + from + " to " + to + ")", SUCCESS_COLOR);
+
+        } catch (Exception e) {
+            showStatusMessage(e.getMessage(), DANGER_COLOR);
+        }
+    }
     private void loadPatientsSortedByName() {
         try {
             model.setRowCount(0);
