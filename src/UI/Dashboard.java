@@ -107,8 +107,7 @@ public class Dashboard extends JFrame {
 		JButton medicineBtn = createEnhancedButton("Manage Medicines", btnFont, btnSize, new Color(230, 126, 34));
 		JButton logoutBtn = createEnhancedButton("Logout", btnFont, btnSize, new Color(231, 76, 60));
 		JButton generateBtn = createEnhancedButton("Generate", btnFont, btnSize, new Color(26, 188, 156));
-		JButton changeYearBtn = new JButton("Change Year");
-
+		
 		// Add buttons to grid
 		gridPanel.add(addPatientBtn);
 		gridPanel.add(viewPatientBtn);
@@ -194,24 +193,6 @@ public class Dashboard extends JFrame {
 			}
 		});
 		
-		changeYearBtn.addActionListener(e -> {
-		    Integer[] years = {2026, 2027, 2028};
-
-		    Integer selected = (Integer) JOptionPane.showInputDialog(
-		            this,
-		            "Select Year",
-		            "Change Year",
-		            JOptionPane.PLAIN_MESSAGE,
-		            null,
-		            years,
-		            SessionManager.getYear()
-		    );
-
-		    if (selected != null) {
-		        SessionManager.setYear(selected);
-		        JOptionPane.showMessageDialog(this, "Year Changed to " + selected);
-		    }
-		});
 	}
 	
 
