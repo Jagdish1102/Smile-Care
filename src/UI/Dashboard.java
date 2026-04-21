@@ -3,6 +3,8 @@ package UI;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.geom.RoundRectangle2D;
+import java.net.URL;
+
 import util.AppResources;
 import util.SessionManager;
 
@@ -92,7 +94,7 @@ public class Dashboard extends JFrame {
 		centerPanel.add(Box.createRigidArea(new Dimension(0, 30)));
 
 		// 🔷 Buttons Grid with enhanced styling
-		JPanel gridPanel = new JPanel(new GridLayout(2, 4, 25, 25));
+		JPanel gridPanel = new JPanel(new GridLayout(2, 3, 25, 25));
 		gridPanel.setOpaque(false);
 		gridPanel.setBorder(BorderFactory.createEmptyBorder(20, 30, 30, 30));
 
@@ -103,7 +105,6 @@ public class Dashboard extends JFrame {
 		JButton addPatientBtn = createEnhancedButton("Add Patient", btnFont, btnSize, new Color(52, 152, 219));
 		JButton viewPatientBtn = createEnhancedButton("View Patients", btnFont, btnSize, new Color(46, 204, 113));
 		JButton billingBtn = createEnhancedButton("Billing", btnFont, btnSize, new Color(155, 89, 182));
-		JButton viewBillsBtn = createEnhancedButton("View Bills", btnFont, btnSize, new Color(241, 196, 15));
 		JButton medicineBtn = createEnhancedButton("Manage Medicines", btnFont, btnSize, new Color(230, 126, 34));
 		JButton logoutBtn = createEnhancedButton("Logout", btnFont, btnSize, new Color(231, 76, 60));
 		JButton generateBtn = createEnhancedButton("Generate", btnFont, btnSize, new Color(26, 188, 156));
@@ -112,7 +113,6 @@ public class Dashboard extends JFrame {
 		gridPanel.add(addPatientBtn);
 		gridPanel.add(viewPatientBtn);
 		gridPanel.add(billingBtn);
-		gridPanel.add(viewBillsBtn);
 		gridPanel.add(medicineBtn);
 		gridPanel.add(generateBtn); 
 		gridPanel.add(logoutBtn);
@@ -156,10 +156,7 @@ public class Dashboard extends JFrame {
 			dispose();
 		});
 
-		viewBillsBtn.addActionListener(e -> {
-			new ViewBills().setVisible(true);
-			dispose();
-		});
+		
 
 		medicineBtn.addActionListener(e -> {
 			new MedicineManager().setVisible(true);
@@ -250,28 +247,40 @@ public class Dashboard extends JFrame {
 	// 🔹 Create welcome card
 	private JPanel createWelcomeCard() {
 
-		ImageIcon bgIcon = new ImageIcon(getClass().getResource("/resources/Smile_Care.png"));
-		Image bgImage = bgIcon.getImage();
+	    URL url = getClass().getResource("/Smile_Care.png");
 
-		JPanel card = new JPanel() {
-			@Override
-			protected void paintComponent(Graphics g) {
-				super.paintComponent(g);
+	    if (url == null) {
+	        System.out.println("Banner not found! Check path.");
+	        
+	        // return empty panel to avoid crash
+	        JPanel fallback = new JPanel();
+	        fallback.setPreferredSize(new Dimension(800, 200));
+	        fallback.setBackground(Color.LIGHT_GRAY);
+	        return fallback;
+	    }
 
-				Graphics2D g2d = (Graphics2D) g.create();
-				g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+	    ImageIcon bgIcon = new ImageIcon(url);
+	    Image bgImage = bgIcon.getImage();
 
-				// Draw full wallpaper
-				g2d.drawImage(bgImage, 0, 0, getWidth(), getHeight(), this);
+	    JPanel card = new JPanel() {
+	        @Override
+	        protected void paintComponent(Graphics g) {
+	            super.paintComponent(g);
 
-				g2d.dispose();
-			}
-		};
+	            Graphics2D g2d = (Graphics2D) g.create();
+	            g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
 
-		card.setLayout(new BorderLayout());
-		card.setOpaque(false);
+	            // Draw full wallpaper
+	            g2d.drawImage(bgImage, 0, 0, getWidth(), getHeight(), this);
 
-		return card;
+	            g2d.dispose();
+	        }
+	    };
+
+	    card.setLayout(new BorderLayout());
+	    card.setOpaque(false);
+
+	    return card;
 	}
 
 	// 🔹 Create individual stat card

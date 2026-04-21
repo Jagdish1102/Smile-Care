@@ -2,9 +2,12 @@ package UI;
 
 import dao.PatientDAO;
 import model.Patient;
+import util.UppercaseDocumentFilter;
 
 import javax.swing.*;
 import javax.swing.border.*;
+import javax.swing.text.AbstractDocument;
+
 import java.awt.*;
 import java.awt.event.*;
 import java.time.LocalDate;
@@ -304,6 +307,7 @@ public class AddPatientForm extends JFrame {
 
     private JTextField createSensitiveTextField(String text, Font font) {
         JTextField tf = new JTextField(text);
+
         tf.setFont(font);
         tf.setHorizontalAlignment(JTextField.LEFT);
         tf.setMargin(new Insets(10, 12, 10, 12));
@@ -313,6 +317,9 @@ public class AddPatientForm extends JFrame {
         tf.setFocusable(true);
         tf.setRequestFocusEnabled(true);
         tf.setCursor(new Cursor(Cursor.TEXT_CURSOR));
+
+        // 🔥 AUTO UPPERCASE APPLY HERE
+        ((AbstractDocument) tf.getDocument()).setDocumentFilter(new UppercaseDocumentFilter());
 
         tf.addMouseListener(new MouseAdapter() {
             @Override
@@ -329,12 +336,14 @@ public class AddPatientForm extends JFrame {
         Border defaultBorder = BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(new Color(200, 200, 200), 2, true),
                 BorderFactory.createEmptyBorder(8, 12, 8, 12));
+
         tf.setBorder(defaultBorder);
 
         tf.addFocusListener(new FocusAdapter() {
             @Override
             public void focusGained(FocusEvent e) {
-                tf.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(PRIMARY_COLOR, 2, true),
+                tf.setBorder(BorderFactory.createCompoundBorder(
+                        BorderFactory.createLineBorder(PRIMARY_COLOR, 2, true),
                         BorderFactory.createEmptyBorder(8, 12, 8, 12)));
                 tf.setBackground(new Color(245, 250, 255));
             }
@@ -348,7 +357,6 @@ public class AddPatientForm extends JFrame {
 
         return tf;
     }
-
     private JPanel createButtonPanel() {
         JPanel southContainer = new JPanel(new BorderLayout());
         southContainer.setBackground(PANEL_COLOR);

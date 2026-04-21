@@ -2,6 +2,7 @@ package util;
 
 import javax.swing.*;
 import java.awt.*;
+import java.net.URL;
 
 public class AppResources {
 
@@ -14,27 +15,31 @@ public class AppResources {
 
         if (logoIcon == null) {
             try {
-                ImageIcon icon = new ImageIcon(
-                        AppResources.class.getResource("/resources/logo.png"));
+                URL url = AppResources.class.getResource("/logo.png");
 
+                if (url == null) {
+                    System.out.println("Logo not found!");
+                    return null;
+                }
+
+                ImageIcon icon = new ImageIcon(url);
                 Image img = icon.getImage().getScaledInstance(60, 60, Image.SCALE_SMOOTH);
                 logoIcon = new ImageIcon(img);
 
             } catch (Exception e) {
-                System.out.println("Logo not found!");
+                e.printStackTrace();
             }
         }
 
         return logoIcon;
     }
-
     // ========= WINDOW ICON =========
     public static Image getAppIcon() {
 
         if (appIcon == null) {
             try {
                 appIcon = new ImageIcon(
-                        AppResources.class.getResource("/resources/logo.png")).getImage();
+                		AppResources.class.getResource("/logo.png")).getImage();
             } catch (Exception e) {
                 System.out.println("App icon not found!");
             }
@@ -49,7 +54,7 @@ public class AppResources {
         if (smileWallpaper == null) {
             try {
                 smileWallpaper = new ImageIcon(
-                        AppResources.class.getResource("/resources/smile Care.png")).getImage();
+                		AppResources.class.getResource("/Smile_Care.png")).getImage();
             } catch (Exception e) {
                 System.out.println("Wallpaper not found!");
             }
