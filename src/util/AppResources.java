@@ -2,6 +2,7 @@ package util;
 
 import javax.swing.*;
 import java.awt.*;
+import java.io.File;
 import java.net.URL;
 
 public class AppResources {
@@ -15,7 +16,7 @@ public class AppResources {
 
         if (logoIcon == null) {
             try {
-                URL url = AppResources.class.getResource("/logo.png");
+                URL url = resolveResource("logo.png");
 
                 if (url == null) {
                     System.out.println("Logo not found!");
@@ -36,7 +37,7 @@ public class AppResources {
     
     public static ImageIcon getIcon(String name, int width, int height) {
         try {
-            URL url = AppResources.class.getResource("/" + name);
+            URL url = resolveResource(name);
 
             if (url == null) {
                 System.out.println("Icon not found: " + name);
@@ -58,8 +59,10 @@ public class AppResources {
 
         if (appIcon == null) {
             try {
-                appIcon = new ImageIcon(
-                		AppResources.class.getResource("/logo.png")).getImage();
+                URL url = resolveResource("logo.png");
+                if (url != null) {
+                    appIcon = new ImageIcon(url).getImage();
+                }
             } catch (Exception e) {
                 System.out.println("App icon not found!");
             }
@@ -73,13 +76,51 @@ public class AppResources {
 
         if (smileWallpaper == null) {
             try {
-                smileWallpaper = new ImageIcon(
-                		AppResources.class.getResource("/Smile_Care.png")).getImage();
+                URL url = resolveResource("Smile_Care.png");
+                if (url != null) {
+                    smileWallpaper = new ImageIcon(url).getImage();
+                }
             } catch (Exception e) {
                 System.out.println("Wallpaper not found!");
             }
         }
 
         return smileWallpaper;
+    }
+
+    public static URL resolveResource(String name) {
+        if (name == null || name.trim().isEmpty()) {
+            return null;
+        }
+        String clean = name.startsWith("/") ? name.substring(1) : name;
+        URL url = AppResources.class.getResource("/resources/" + clean);
+        if (url == null) {
+            url = AppResources.class.getResource("/" + clean);
+        }
+        if (url == null) {
+            url = AppResources.class.getClassLoader().getResource("resources/" + clean);
+        }
+        if (url == null) {
+            url = AppResources.class.getClassLoader().getResource(clean);
+        }
+        if (url == null) {
+            // IDE fallback: read directly from project folders
+            String[] paths = {
+                    "src/resources/" + clean,
+                    "resources/" + clean,
+                    "src/" + clean,
+                    clean
+            };
+            for (String p : paths) {
+                File f = new File(p);
+                if (f.exists()) {
+                    try {
+                        return f.toURI().toURL();
+                    } catch (Exception ignored) {
+                    }
+                }
+            }
+        }
+        return url;
     }
 }

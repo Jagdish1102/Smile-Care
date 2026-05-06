@@ -15,12 +15,7 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.print.Printable;
 import java.awt.print.PrinterJob;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -43,7 +38,7 @@ import javax.swing.Timer;
 import javax.swing.border.TitledBorder;
 import javax.swing.table.DefaultTableModel;
 
-import dhule_Hospital_database.DBConnection;
+import controller.GenerateFormsController;
 import model.QuotationItem;
 
 /**
@@ -63,7 +58,6 @@ public class GenerateForms extends JDialog {
 	private static final Color C_BORDER = new Color(207, 216, 220);
 	private static final Color C_PAPER = new Color(255, 255, 245);
 	private static final String FONT_FAMILY = "Segoe UI";
-	private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
 	// ==================== MEDICAL CERTIFICATE COMPONENTS ====================
 	private JTextField patientNameField, ageField, genderField, fromDateField, toDateField;
@@ -82,6 +76,7 @@ public class GenerateForms extends JDialog {
 	private JButton addItemBtn, removeItemBtn, generateQuotationBtn, printQuotationBtn;
 	private List<QuotationItem> quotationItems = new ArrayList<>();
 	private double subtotal = 0, tax = 0, total = 0;
+    private final GenerateFormsController controller = new GenerateFormsController();
 
 	// ==================== CONSTRUCTOR ====================
 	public GenerateForms(JFrame parent) {
@@ -101,8 +96,8 @@ public class GenerateForms extends JDialog {
 
 		JTabbedPane tabs = new JTabbedPane();
 		tabs.setFont(new Font(FONT_FAMILY, Font.BOLD, 14));
-		tabs.addTab("📋 Medical Certificate", createMedicalCertificatePanel());
-		tabs.addTab("💰 Quotation", createQuotationPanel());
+		tabs.addTab(" Medical Certificate", createMedicalCertificatePanel());
+		tabs.addTab(" Quotation", createQuotationPanel());
 		add(tabs, BorderLayout.CENTER);
 
 		add(createFooter(), BorderLayout.SOUTH);
@@ -297,11 +292,9 @@ public class GenerateForms extends JDialog {
 	            new Font(FONT_FAMILY, Font.BOLD, 13),
 	            C_PRIMARY));
 
-	    // ✅ FIX: Create addBar FIRST
 	    JPanel addBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 8));
 	    addBar.setBackground(C_BG);
 
-	    // ================= SERVICE DROPDOWN =================
 	    addBar.add(createLabel("Service:"));
 
 	    serviceCombo = new JComboBox<>();
@@ -309,11 +302,10 @@ public class GenerateForms extends JDialog {
 	    serviceCombo.setEditable(true);
 	    serviceCombo.setPreferredSize(new Dimension(200, 32));
 
-	    loadServices(); // DB se load
+	    loadServices();
 	    addBar.add(serviceCombo);
 
-	    // ================= DELETE BUTTON =================
-	    JButton deleteServiceBtn = createButton("❌ Delete", C_DANGER, 110, 32);
+	    JButton deleteServiceBtn = createButton(" Delete", C_DANGER, 110, 32);
 
 	    deleteServiceBtn.addActionListener(e -> {
 	        String service = serviceCombo.getEditor().getItem().toString().trim();
@@ -339,19 +331,16 @@ public class GenerateForms extends JDialog {
 
 	    addBar.add(deleteServiceBtn);
 
-	    // ================= QTY =================
 	    addBar.add(createLabel("Qty:"));
 	    quantitySpinner = new JSpinner(new SpinnerNumberModel(1, 1, 999, 1));
 	    quantitySpinner.setPreferredSize(new Dimension(70, 32));
 	    addBar.add(quantitySpinner);
 
-	    // ================= PRICE =================
 	    addBar.add(createLabel("Price (₹):"));
 	    priceField = createTextField(100);
 	    addBar.add(priceField);
 
-	    // ================= ADD BUTTON =================
-	    addItemBtn = createButton("➕ Add", C_SUCCESS, 100, 32);
+	    addItemBtn = createButton(" Add", C_SUCCESS, 100, 32);
 	    addItemBtn.addActionListener(e -> addQuotationItem());
 	    addBar.add(addItemBtn);
 
@@ -379,9 +368,8 @@ public class GenerateForms extends JDialog {
 
 	    center.add(quotationTable, BorderLayout.CENTER);
 
-	    // ================= REMOVE ITEM =================
 	    JPanel actionBar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 8));
-	    removeItemBtn = createButton("🗑️ Remove Selected", C_DANGER, 160, 32);
+	    removeItemBtn = createButton(" Remove Selected", C_DANGER, 160, 32);
 	    removeItemBtn.addActionListener(e -> removeQuotationItem());
 	    actionBar.add(removeItemBtn);
 
@@ -404,6 +392,27 @@ public class GenerateForms extends JDialog {
 
 	    bottom.add(totals, BorderLayout.NORTH);
 
+	    // ✅ ================= TERMS PANEL (FIX) =================
+	    JPanel termsPanel = new JPanel(new BorderLayout(8, 0));
+	    termsPanel.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
+
+	    termsPanel.add(createLabel("Terms:"), BorderLayout.WEST);
+
+	    termsArea = new JTextArea(2, 60);
+	    termsArea.setFont(new Font(FONT_FAMILY, Font.PLAIN, 12));
+	    termsArea.setText(
+	            "1. Payment due within 15 days\n" +
+	            "2. Subject to local jurisdiction\n" +
+	            "3. Thank you for choosing Smile Care!"
+	    );
+	    termsArea.setLineWrap(true);
+	    termsArea.setBorder(BorderFactory.createLineBorder(C_BORDER));
+
+	    termsPanel.add(termsArea, BorderLayout.CENTER);
+
+	    bottom.add(termsPanel, BorderLayout.CENTER);
+	    // ======================================================
+
 	    JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 10));
 
 	    generateQuotationBtn = createButton("Generate", C_SUCCESS, 200, 42);
@@ -421,7 +430,6 @@ public class GenerateForms extends JDialog {
 
 	    return panel;
 	}
-
 	// ==================== MEDICAL CERTIFICATE LOGIC ====================
 	private void generateMedicalCertificate() {
 		String name = patientNameField.getText().trim();
@@ -449,26 +457,7 @@ public class GenerateForms extends JDialog {
 			return;
 		}
 
-		// Calculate duration in days
-		long days = 0;
-		try {
-			LocalDate from = LocalDate.parse(fromDate);
-			LocalDate to = LocalDate.parse(toDate);
-			days = ChronoUnit.DAYS.between(from, to) + 1;
-		} catch (Exception ignored) {
-		}
-
-		String durationText = (days >= 14) ? "two weeks" : (days + " days");
-
-		String certificate = String.format("═══════════════════════════════════════════════════════════════════\n"
-				+ "                      MEDICAL CERTIFICATE\n"
-				+ "═══════════════════════════════════════════════════════════════════\n\n"
-				+ "This is to certify that %s, %s years old, %s, was under my care for:\n" + "%s\n\n"
-				+ "Following the procedure, the patient was advised rest with specific restrictions,\n"
-				+ "including minimizing screen time and limiting speech, starting from %s for a duration of %s.\n\n"
-				+ "Additional advice: %s\n\n\n" + "Dr. Amit Arvind Jain\n" + "MDS, PhD\n" + "Smile Care Dental Clinic\n"
-				+ "═══════════════════════════════════════════════════════════════════\n", name, age, gender, diagnosis,
-				fromDate, durationText, advice);
+		String certificate = controller.generateMedicalCertificateText(name, age, gender, fromDate, diagnosis, advice, toDate);
 
 		previewArea.setText(certificate);
 		previewArea.setCaretPosition(0);
@@ -478,54 +467,22 @@ public class GenerateForms extends JDialog {
 	// ==================== QUOTATION LOGIC ====================
 	// UPDATED METHOD
 	private void loadServices() {
+        Object currentTyped = serviceCombo.getEditor().getItem();
 	    serviceCombo.removeAllItems();
-
-	    String sql = "SELECT service_name FROM services ORDER BY service_name";
-
-	    try (Connection con = DBConnection.connect();
-	         PreparedStatement ps = con.prepareStatement(sql);
-	         ResultSet rs = ps.executeQuery()) {
-
-	        while (rs.next()) {
-	            serviceCombo.addItem(rs.getString("service_name"));
-	        }
-
-	    } catch (Exception e) {
-	        e.printStackTrace();
-	    }
+        for (String serviceName : controller.getAllServices()) {
+            serviceCombo.addItem(serviceName);
+        }
+        if (currentTyped != null) {
+            serviceCombo.getEditor().setItem(currentTyped.toString());
+        }
 	}
 	// NEW METHOD
 	private void saveServiceIfNotExists(String service) {
-
-	    String sql = "INSERT INTO services(service_name) " +
-	                 "SELECT ? WHERE NOT EXISTS " +
-	                 "(SELECT 1 FROM services WHERE LOWER(service_name)=LOWER(?))";
-
-	    try (Connection con = DBConnection.connect();
-	         PreparedStatement ps = con.prepareStatement(sql)) {
-
-	        ps.setString(1, service);
-	        ps.setString(2, service);
-	        ps.executeUpdate();
-
-	    } catch (Exception e) {
-	        e.printStackTrace();
-	    }
+        controller.saveServiceIfNotExists(service);
 	}
 	// NEW METHOD
 	private void deleteService(String service) {
-
-	    String sql = "DELETE FROM services WHERE LOWER(service_name)=LOWER(?)";
-
-	    try (Connection con = DBConnection.connect();
-	         PreparedStatement ps = con.prepareStatement(sql)) {
-
-	        ps.setString(1, service);
-	        ps.executeUpdate();
-
-	    } catch (Exception e) {
-	        e.printStackTrace();
-	    }
+        controller.deleteService(service);
 	}
 
 	// UPDATED METHOD
@@ -559,8 +516,8 @@ public class GenerateForms extends JDialog {
 	    });
 
 	    loadServices(); // refresh dropdown
-
-	    serviceCombo.setSelectedItem("");
+        serviceCombo.setSelectedItem(service);
+        serviceCombo.getEditor().setItem("");
 	    quantitySpinner.setValue(1);
 	    priceField.setText("");
 
@@ -595,11 +552,7 @@ public class GenerateForms extends JDialog {
 	}
 
 	private void calculateTotals() {
-	    subtotal = 0;
-
-	    for (QuotationItem item : quotationItems) {
-	        subtotal += item.getTotal();
-	    }
+	    subtotal = controller.calculateSubtotal(quotationItems);
 
 	    // ❌ Remove GST
 	    tax = 0;
@@ -646,65 +599,9 @@ public class GenerateForms extends JDialog {
 	}
 
 	private String buildQuotationText(String patientName) {
-
-	    String qNo = "QTN-" + (System.currentTimeMillis() % 100000);
-	    String date = LocalDate.now().format(DATE_FMT);
 	    String phone = patientPhoneFieldQ.getText().trim();
-
-	    StringBuilder sb = new StringBuilder();
-
-	    // ✅ TOP SPACE for pre-printed letterhead (IMPORTANT)
-	    sb.append("\n\n\n\n\n"); // adjust (5 lines space)
-
-	    // Header
-	    sb.append("                         QUOTATION\n\n");
-
-	    sb.append(String.format("Quotation No : %s%n", qNo));
-	    sb.append(String.format("Date         : %s%n", date));
-	    sb.append(String.format("Patient      : %s%n", patientName));
-	    if (!phone.isEmpty())
-	        sb.append(String.format("Phone        : %s%n", phone));
-
-	    sb.append("\n---------------------------------------------------------------\n");
-
-	    // Table Header
-	    sb.append(String.format("%-30s %5s %10s %12s%n", "Service", "Qty", "Price", "Total"));
-	    sb.append("---------------------------------------------------------------\n");
-
-	    // Items
-	    for (QuotationItem item : quotationItems) {
-	        sb.append(String.format("%-30s %5d %10.2f %12.2f%n",
-	                truncate(item.getService(), 30),
-	                item.getQuantity(),
-	                item.getUnitPrice(),
-	                item.getTotal()));
-	    }
-
-	    sb.append("---------------------------------------------------------------\n");
-
-	    // Totals (Right aligned better)
-	    sb.append(String.format("%40s %12.2f%n", "Subtotal:", subtotal));
-	    sb.append("---------------------------------------------------------------\n");
-	    sb.append(String.format("%40s %12.2f%n", "GRAND TOTAL:", total));
-
-	    sb.append("\n");
-
-	    // Terms
-	    sb.append("Terms & Conditions:\n");
-	    for (String line : termsArea.getText().split("\n")) {
-	        if (!line.trim().isEmpty()) {
-	            sb.append("• ").append(line).append("\n");
-	        }
-	    }
-
-	    sb.append("\n\nAuthorized Signature\n");
-
-	    return sb.toString();
+        return controller.buildQuotationText(patientName, phone, quotationItems, subtotal, total, termsArea.getText());
 	}
-	private String truncate(String s, int max) {
-		return s.length() <= max ? s : s.substring(0, max - 3) + "...";
-	}
-
 	private void printQuotation() {
 		if (quotationItems.isEmpty()) {
 			showToast("Generate quotation first");

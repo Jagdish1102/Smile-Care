@@ -1,6 +1,6 @@
 package dao;
 
-import dhule_Hospital_database.DBConnection;
+import util.DBConnection;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;

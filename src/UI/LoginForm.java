@@ -1,10 +1,5 @@
 package UI;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -12,10 +7,13 @@ import javax.swing.JOptionPane;
 import javax.swing.JPasswordField;
 import javax.swing.JTextField;
 
+import controller.AuthController;
+
 public class LoginForm extends JFrame {
 
     JTextField userField;
     JPasswordField passField;
+    private final AuthController authController = new AuthController();
 
     public LoginForm() {
 
@@ -62,23 +60,16 @@ public class LoginForm extends JFrame {
             return;
         }
 
-        String sql = "SELECT 1 FROM users WHERE username=? AND password=?";
-        try (Connection con = dhule_Hospital_database.DBConnection.connect();
-             PreparedStatement ps = con.prepareStatement(sql)) {
-            ps.setString(1, username);
-            ps.setString(2, password);
-
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    JOptionPane.showMessageDialog(this, "Login Successful ✅");
-                    util.SessionManager.setUser(username);  // ✅ SET SESSION
-                    new Dashboard().setVisible(true);
-                    dispose();
-                } else {
-                    JOptionPane.showMessageDialog(this, "Invalid Username or Password ❌");
-                }
+        try {
+            if (authController.login(username, password)) {
+                JOptionPane.showMessageDialog(this, "Login Successful ✅");
+                util.SessionManager.setUser(username);  // ✅ SET SESSION
+                new Dashboard().setVisible(true);
+                dispose();
+            } else {
+                JOptionPane.showMessageDialog(this, "Invalid Username or Password ❌");
             }
-        } catch (SQLException ex) {
+        } catch (Exception ex) {
             ex.printStackTrace();
             JOptionPane.showMessageDialog(this, "Database Error!");
         }

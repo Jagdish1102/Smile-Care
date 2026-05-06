@@ -13,7 +13,6 @@ import java.awt.Graphics2D;
 import java.awt.GridLayout;
 import java.awt.Image;
 import java.awt.RenderingHints;
-import java.net.URL;
 
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -282,7 +281,7 @@ public class Dashboard extends JFrame {
 	// 🔹 Create welcome card
 	private JPanel createWelcomeCard() {
 
-		URL url = getClass().getResource("/Smile_Care.png");
+		java.net.URL url = AppResources.resolveResource("Smile_Care.png");
 
 		if (url == null) {
 			System.out.println("Banner not found! Check path.");

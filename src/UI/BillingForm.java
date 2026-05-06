@@ -24,9 +24,6 @@ import java.awt.geom.RoundRectangle2D;
 import java.awt.print.Printable;
 import java.awt.print.PrinterException;
 import java.awt.print.PrinterJob;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Date;
@@ -51,7 +48,9 @@ import javax.swing.UIManager;
 import javax.swing.border.Border;
 import javax.swing.border.TitledBorder;
 
-import dhule_Hospital_database.DBConnection;
+import controller.BillingController;
+import model.BillCalculation;
+import model.PatientBillingInfo;
 import util.AppResources;
 
 
@@ -66,6 +65,7 @@ import util.AppResources;
  * healthcare UI – rounded corners, teal/blue palette, readable fonts
  */
 public class BillingForm extends JFrame {
+    private final BillingController controller = new BillingController();
 
 	// ── Form state ────────────────────────────────────────────────────────────
 	private boolean billSaved = false;
@@ -143,8 +143,7 @@ public class BillingForm extends JFrame {
 	 * @return formatted bill number, e.g. "B102-19042026"
 	 */
 	private String generateBillNumber(int patientDbId) {
-		String datePart = LocalDate.now().format(DateTimeFormatter.ofPattern("ddMMyyyy")); // e.g. 19042026
-		return "B" + patientDbId + "-" + datePart;
+		return controller.generateBillNumber(patientDbId);
 	}
 
 	/** Updates the visible bill-number label from the current patient DB id. */
@@ -542,15 +541,10 @@ public class BillingForm extends JFrame {
 
 	private void loadPatients() {
 		try {
-			String sql = "SELECT id, name FROM patients ORDER BY name";
-			try (Connection con = DBConnection.connect();
-					PreparedStatement ps = con.prepareStatement(sql);
-					ResultSet rs = ps.executeQuery()) {
-				patientCombo.addItem("-- Select Patient --");
-				while (rs.next()) {
-					patientCombo.addItem(rs.getString("name"));
-				}
-			}
+			patientCombo.addItem("-- Select Patient --");
+            for (String name : controller.getPatientNames()) {
+                patientCombo.addItem(name);
+            }
 		} catch (Exception e) {
 			e.printStackTrace();
 			JOptionPane.showMessageDialog(this, "Error loading patients.", "Error", JOptionPane.ERROR_MESSAGE);
@@ -565,31 +559,26 @@ public class BillingForm extends JFrame {
 		}
 		String selectedName = (String) patientCombo.getSelectedItem();
 		try {
-			String sql = "SELECT id, age, gender FROM patients WHERE name = ? LIMIT 1";
-			try (Connection con = DBConnection.connect(); PreparedStatement ps = con.prepareStatement(sql)) {
-				ps.setString(1, selectedName);
-				try (ResultSet rs = ps.executeQuery()) {
-					if (rs.next()) {
-						currentPatientDbId = rs.getInt("id");
-						String displayId = String.format("PT%03d", currentPatientDbId);
-						patientIdLabel.setText(displayId);
-						patientAgeLabel.setText(rs.getInt("age") + " yrs");
-						patientGenderLabel.setText(rs.getString("gender"));
+            PatientBillingInfo info = controller.getPatientBillingInfo(selectedName);
+            if (info != null) {
+                currentPatientDbId = info.getId();
+                String displayId = String.format("PT%03d", currentPatientDbId);
+                patientIdLabel.setText(displayId);
+                patientAgeLabel.setText(info.getAge() + " yrs");
+                patientGenderLabel.setText(info.getGender());
 
-						// Auto-generate and show bill number immediately
-						refreshBillNumber();
+                // Auto-generate and show bill number immediately
+                refreshBillNumber();
 
-						// Reset totals
-						amountField.setText("");
-						discountSpinner.setValue(0.0);
-						subtotalLabel.setText("₹ 0.00");
-						discountLabel.setText("₹ 0.00");
-						totalLabel.setText("₹ 0.00");
-						receiptArea.setText("");
-						billSaved = false;
-					}
-				}
-			}
+                // Reset totals
+                amountField.setText("");
+                discountSpinner.setValue(0.0);
+                subtotalLabel.setText("₹ 0.00");
+                discountLabel.setText("₹ 0.00");
+                totalLabel.setText("₹ 0.00");
+                receiptArea.setText("");
+                billSaved = false;
+            }
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -599,11 +588,10 @@ public class BillingForm extends JFrame {
 		try {
 			double amount = amountField.getText().isEmpty() ? 0 : Double.parseDouble(amountField.getText());
 			double pct = (Double) discountSpinner.getValue();
-			double disc = amount * pct / 100.0;
-			double total = amount - disc;
-			subtotalLabel.setText(fmtRs(amount));
-			discountLabel.setText(fmtRs(disc));
-			totalLabel.setText(fmtRs(total));
+            BillCalculation calculation = controller.calculateBill(amount, pct);
+			subtotalLabel.setText(fmtRs(calculation.getSubtotal()));
+			discountLabel.setText(fmtRs(calculation.getDiscountAmount()));
+			totalLabel.setText(fmtRs(calculation.getTotal()));
 		} catch (NumberFormatException ex) {
 			subtotalLabel.setText("₹ 0.00");
 			discountLabel.setText("₹ 0.00");
@@ -727,23 +715,7 @@ public class BillingForm extends JFrame {
 	private void persistBill(String name, double amount, double disc, double total, String payment, String billNo) {
 		if (billSaved)
 			return;
-		try {
-			String sql = "INSERT INTO billing(patient_name,amount,discount,total,payment_mode,bill_no,date) "
-					+ "VALUES(?,?,?,?,?,?,?)";
-			try (Connection con = DBConnection.connect(); PreparedStatement ps = con.prepareStatement(sql)) {
-				ps.setString(1, name);
-				ps.setDouble(2, amount);
-				ps.setDouble(3, disc);
-				ps.setDouble(4, total);
-				ps.setString(5, payment);
-				ps.setString(6, billNo);
-				ps.setString(7, LocalDate.now().toString());
-				ps.executeUpdate();
-			}
-			billSaved = true;
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
+        billSaved = controller.saveBill(name, amount, disc, total, payment, billNo);
 	}
 
 	private void resetForm() {

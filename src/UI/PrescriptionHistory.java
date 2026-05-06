@@ -1,13 +1,13 @@
 package UI;
 
-import dhule_Hospital_database.DBConnection;
+import controller.PrescriptionHistoryController;
+import model.PrescriptionHistoryEntry;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.JTableHeader;
 import javax.swing.table.TableRowSorter;
 import java.awt.*;
-import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -18,6 +18,7 @@ public class PrescriptionHistory extends JFrame {
 	private JTextField searchField;
 	private JLabel countLabel;
 	private TableRowSorter<DefaultTableModel> sorter;
+    private final PrescriptionHistoryController controller = new PrescriptionHistoryController();
 
 	public PrescriptionHistory(String patientName) {
 
@@ -155,21 +156,9 @@ public class PrescriptionHistory extends JFrame {
 
 	private List<Object[]> fetchPrescriptions(String patientName) {
 		List<Object[]> rows = new ArrayList<>();
-		String sql = "SELECT medicines, COALESCE(advice, notes, '') AS advice_text, date FROM prescriptions WHERE patient_name=? ORDER BY date DESC";
-		try (Connection con = DBConnection.connect();
-		     PreparedStatement ps = con.prepareStatement(sql)) {
-			ps.setString(1, patientName);
-			try (ResultSet rs = ps.executeQuery()) {
-				while (rs.next()) {
-					String date = rs.getString("date");
-					String med = rs.getString("medicines");
-					String advice = rs.getString("advice_text");
-					rows.add(new Object[] { date, med, advice });
-				}
-			}
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
+        for (PrescriptionHistoryEntry entry : controller.getPrescriptionHistory(patientName)) {
+            rows.add(new Object[] { entry.getDate(), entry.getMedicines(), entry.getAdvice() });
+        }
 		return rows;
 	}
 

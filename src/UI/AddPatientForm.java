@@ -500,13 +500,23 @@ public class AddPatientForm extends JFrame {
 
     private void setupActions() {
         viewBtn.addActionListener(e -> {
-            new ViewPatients().setVisible(true);
-            dispose();
+            SwingUtilities.invokeLater(() -> {
+                try {
+                    new ViewPatients().setVisible(true);
+                    dispose();
+                } catch (Throwable ex) {
+                    ex.printStackTrace();
+                    JOptionPane.showMessageDialog(this, "Unable to open View Patients: " + ex.getMessage(),
+                            "Open Error", JOptionPane.ERROR_MESSAGE);
+                }
+            });
         });
 
         backBtn.addActionListener(e -> {
-            new Dashboard().setVisible(true);
-            dispose();
+            SwingUtilities.invokeLater(() -> {
+                new Dashboard().setVisible(true);
+                dispose();
+            });
         });
 
         saveBtn.addActionListener(e -> savePatient());

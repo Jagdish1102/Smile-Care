@@ -860,15 +860,16 @@ public class PrescriptionForm extends JFrame {
 
 	            // ───────── MEDICINE PRINT ─────────
 	            String[] lines = rxText.split("\n");
-
+	            int shiftRight = 20; // 👈 control value
 	            int leftX = 40;
-	            int medX  = 130;
+	            int medX  = 130 + shiftRight;
 	            int rightX = pageW - 10;
 
 	            int y = 180;
 	            int i = 0;
 
 	            while (i < lines.length) {
+
 	                if (y > 700) break;
 
 	                if (lines[i].trim().isEmpty()) {
@@ -881,22 +882,39 @@ public class PrescriptionForm extends JFrame {
 	                String[] parts1 = line1.split("\\s{2,}", 2);
 
 	                String form = parts1.length > 1 ? parts1[0].trim() : "";
-	                String med  = parts1.length > 1 ? parts1[1].trim() : line1;
+
+	                // ✅ CAPITAL medicine name
+	                String med = (parts1.length > 1 ? parts1[1].trim() : line1).toUpperCase();
+
+	                int indent = 25; // 👈 form ke liye space
 
 	                g2d.setFont(medFont);
-	                if (!form.isEmpty()) g2d.drawString(form, leftX, y);
+
+	                if (!form.isEmpty()) {
+	                    g2d.drawString(form, leftX + indent, y);
+	                }
+
 	                g2d.drawString(med, medX, y);
 	                y += 18;
 
+
 	                // 🔹 Line 2 → Content + Qty
 	                if (i < lines.length && !lines[i].trim().isEmpty()) {
-	                    String line2 = lines[i++].trim();
 
+	                    String line2 = lines[i++].trim();
 	                    int lastSpace = line2.lastIndexOf(' ');
-	                    String content = lastSpace > 0 ? line2.substring(0, lastSpace).trim() : line2;
-	                    String qty     = lastSpace > 0 ? line2.substring(lastSpace).trim() : "";
+
+	                    // ✅ CAPITAL content
+	                    String content = (lastSpace > 0
+	                            ? line2.substring(0, lastSpace).trim()
+	                            : line2).toUpperCase();
+
+	                    String qty = lastSpace > 0
+	                            ? line2.substring(lastSpace).trim()
+	                            : "";
 
 	                    g2d.setFont(subFont);
+
 	                    if (!content.isEmpty()) {
 	                        g2d.drawString(content, medX, y);
 	                    }
@@ -907,16 +925,21 @@ public class PrescriptionForm extends JFrame {
 	                    }
 
 	                    y += 16;
+
 	                } else if (i < lines.length) {
 	                    i++;
 	                }
 
-	                // 🔹 Line 3 → Instruction
+
+	                // 🔹 Line 3 → Instruction (optional CAPITAL)
 	                if (i < lines.length && !lines[i].trim().isEmpty()) {
-	                    String line3 = lines[i++].trim();
+
+	                    String line3 = lines[i++].trim().toUpperCase(); // 👈 optional uppercase
+
 	                    g2d.setFont(subFont);
 	                    g2d.drawString(line3, medX, y);
 	                    y += 18;
+
 	                } else if (i < lines.length) {
 	                    i++;
 	                }
