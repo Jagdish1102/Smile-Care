@@ -33,6 +33,26 @@ public class AppResources {
 
         return logoIcon;
     }
+    
+    public static ImageIcon getIcon(String name, int width, int height) {
+        try {
+            URL url = AppResources.class.getResource("/" + name);
+
+            if (url == null) {
+                System.out.println("Icon not found: " + name);
+                return null;
+            }
+
+            ImageIcon icon = new ImageIcon(url);
+            Image img = icon.getImage().getScaledInstance(width, height, Image.SCALE_SMOOTH);
+
+            return new ImageIcon(img);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
     // ========= WINDOW ICON =========
     public static Image getAppIcon() {
 

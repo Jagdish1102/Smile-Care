@@ -22,20 +22,21 @@ public class PatientDAO {
                 rs.getInt("age"),
                 rs.getString("gender"),
                 rs.getString("phone"),
+                rs.getString("phone2"),
                 rs.getString("address"),
                 rs.getString("disease"),
                 rs.getString("date")
         );
     }
 
-    // ================= CREATE =================
+ // ================= ADD =================
     public static boolean addPatient(Patient p) {
 
         if (p.getName() == null || p.getName().trim().isEmpty()) {
             return false;
         }
 
-        String sql = "INSERT INTO patients(name, age, gender, phone, address, disease, date) VALUES(?,?,?,?,?,?,?)";
+        String sql = "INSERT INTO patients(name, age, gender, phone, phone2, address, disease, date) VALUES(?,?,?,?,?,?,?,?)";
 
         try (Connection conn = DBConnection.connect();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -44,19 +45,18 @@ public class PatientDAO {
             ps.setInt(2, p.getAge());
             ps.setString(3, p.getGender());
             ps.setString(4, p.getPhone());
-            ps.setString(5, p.getAddress());
-            ps.setString(6, p.getDisease());
-            ps.setString(7, p.getDate());
+            ps.setString(5, p.getPhone2()); // ✅ NEW
+            ps.setString(6, p.getAddress());
+            ps.setString(7, p.getDisease());
+            ps.setString(8, p.getDate());
 
-            ps.executeUpdate();
-            return true;
+            return ps.executeUpdate() > 0;
 
         } catch (SQLException e) {
             System.err.println("Error adding patient: " + e.getMessage());
             return false;
         }
     }
-
     // ================= READ ALL =================
     public static List<Patient> getAllPatients() {
 
@@ -99,21 +99,21 @@ public class PatientDAO {
     // ================= UPDATE =================
     public static boolean updatePatient(Patient p) {
 
-        String sql = "UPDATE patients SET name=?, age=?, gender=?, phone=?, address=?, disease=? WHERE id=?";
+        String sql = "UPDATE patients SET name=?, age=?, gender=?, phone=?, phone2=?, address=?, disease=? WHERE id=?";
 
         try (Connection conn = DBConnection.connect();
              PreparedStatement ps = conn.prepareStatement(sql)) {
 
-            ps.setString(1, p.getName());
+            ps.setString(1, p.getName() == null ? "" : p.getName());
             ps.setInt(2, p.getAge());
-            ps.setString(3, p.getGender());
-            ps.setString(4, p.getPhone());
-            ps.setString(5, p.getAddress());
-            ps.setString(6, p.getDisease());
-            ps.setInt(7, p.getId());
+            ps.setString(3, p.getGender() == null ? "" : p.getGender());
+            ps.setString(4, p.getPhone() == null ? "" : p.getPhone());
+            ps.setString(5, p.getPhone2() == null ? "" : p.getPhone2()); // ✅ NEW
+            ps.setString(6, p.getAddress() == null ? "" : p.getAddress());
+            ps.setString(7, p.getDisease() == null ? "" : p.getDisease());
+            ps.setInt(8, p.getId());
 
-            ps.executeUpdate();
-            return true;
+            return ps.executeUpdate() > 0;
 
         } catch (SQLException e) {
             System.err.println("Error updating patient: " + e.getMessage());
@@ -148,7 +148,7 @@ public class PatientDAO {
 
         List<Patient> list = new ArrayList<>();
 
-        String sql = "SELECT * FROM patients WHERE name LIKE ? OR surname LIKE ? OR phone LIKE ? ORDER BY date DESC";
+        String sql = "SELECT * FROM patients WHERE name LIKE ? OR phone LIKE ? OR phone2 LIKE ? ORDER BY date DESC";
 
         try (Connection con = DBConnection.connect();
              PreparedStatement ps = con.prepareStatement(sql)) {
@@ -157,7 +157,7 @@ public class PatientDAO {
 
             ps.setString(1, pattern);
             ps.setString(2, pattern);
-            ps.setString(3, pattern);
+            ps.setString(3, pattern); // ✅ NEW
 
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
@@ -171,7 +171,6 @@ public class PatientDAO {
 
         return list;
     }
-
     // ================= SORT (GENERIC) =================
     public static List<Patient> getPatientsSorted(String column) {
 

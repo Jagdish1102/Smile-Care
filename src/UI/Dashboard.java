@@ -1,12 +1,38 @@
 package UI;
 
-import javax.swing.*;
-import java.awt.*;
-import java.awt.geom.RoundRectangle2D;
+import java.awt.BasicStroke;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Cursor;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.GradientPaint;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.GridLayout;
+import java.awt.Image;
+import java.awt.RenderingHints;
 import java.net.URL;
+
+import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.ImageIcon;
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
+import javax.swing.Timer;
 
 import util.AppResources;
 import util.SessionManager;
+
+
 
 public class Dashboard extends JFrame {
 
@@ -102,19 +128,29 @@ public class Dashboard extends JFrame {
 		Dimension btnSize = new Dimension(250, 120);
 
 		// Create enhanced buttons with icons
-		JButton addPatientBtn = createEnhancedButton("Add Patient", btnFont, btnSize, new Color(52, 152, 219));
-		JButton viewPatientBtn = createEnhancedButton("View Patients", btnFont, btnSize, new Color(46, 204, 113));
-		JButton billingBtn = createEnhancedButton("Billing", btnFont, btnSize, new Color(155, 89, 182));
-		JButton medicineBtn = createEnhancedButton("Manage Medicines", btnFont, btnSize, new Color(230, 126, 34));
-		JButton logoutBtn = createEnhancedButton("Logout", btnFont, btnSize, new Color(231, 76, 60));
-		JButton generateBtn = createEnhancedButton("Generate", btnFont, btnSize, new Color(26, 188, 156));
-		
+		JButton addPatientBtn = createEnhancedButton("Add Patient", btnFont, btnSize, new Color(135, 206, 235),
+				AppResources.getIcon("add_Patient.png", 40, 40));
+
+		JButton viewPatientBtn = createEnhancedButton("View Patients", btnFont, btnSize, new Color(135, 206, 235),
+				AppResources.getIcon("View_Patient.png", 40, 40));
+
+		JButton billingBtn = createEnhancedButton("Billing", btnFont, btnSize, new Color(135, 206, 235),
+				AppResources.getIcon("Bill.png", 40, 40));
+
+		JButton medicineBtn = createEnhancedButton("Manage Medicines", btnFont, btnSize, new Color(135, 206, 235),
+				AppResources.getIcon("Medicin.png", 40, 40));
+
+		JButton generateBtn = createEnhancedButton("Generate", btnFont, btnSize, new Color(135, 206, 235),
+				AppResources.getIcon("Aplication.png", 40, 40));
+
+		JButton logoutBtn = createEnhancedButton("Logout", btnFont, btnSize, new Color(231, 76, 60),
+				AppResources.getIcon("LogOut.png", 40, 40));
 		// Add buttons to grid
 		gridPanel.add(addPatientBtn);
 		gridPanel.add(viewPatientBtn);
 		gridPanel.add(billingBtn);
 		gridPanel.add(medicineBtn);
-		gridPanel.add(generateBtn); 
+		gridPanel.add(generateBtn);
 		gridPanel.add(logoutBtn);
 
 		centerPanel.add(gridPanel);
@@ -156,14 +192,12 @@ public class Dashboard extends JFrame {
 			dispose();
 		});
 
-		
-
 		medicineBtn.addActionListener(e -> {
 			new MedicineManager().setVisible(true);
 		});
-		
+
 		generateBtn.addActionListener(e -> {
-		    new GenerateForms(this).setVisible(true);
+			new GenerateForms(this).setVisible(true);
 		});
 		logoutBtn.addActionListener(e -> {
 
@@ -189,19 +223,20 @@ public class Dashboard extends JFrame {
 				});
 			}
 		});
-		
+
 	}
-	
 
 	// 🔹 Create enhanced button with gradient and hover effects
-	private JButton createEnhancedButton(String text, Font font, Dimension size, Color baseColor) {
-		JButton btn = new JButton(text) {
+	private JButton createEnhancedButton(String text, Font font, Dimension size, Color baseColor, ImageIcon icon) {
+
+		JButton btn = new JButton(text, icon) {
+
 			@Override
 			protected void paintComponent(Graphics g) {
 				Graphics2D g2d = (Graphics2D) g.create();
 				g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-				// Create gradient based on button state
+				// Gradient background
 				Color color1 = baseColor;
 				Color color2 = baseColor.darker();
 
@@ -217,20 +252,14 @@ public class Dashboard extends JFrame {
 				g2d.setPaint(gp);
 				g2d.fillRoundRect(0, 0, getWidth(), getHeight(), 20, 20);
 
-				// Draw border
+				// Border
 				g2d.setColor(new Color(255, 255, 255, 100));
 				g2d.setStroke(new BasicStroke(2));
 				g2d.drawRoundRect(1, 1, getWidth() - 3, getHeight() - 3, 18, 18);
 
-				// Draw text
-				g2d.setColor(Color.WHITE);
-				g2d.setFont(getFont());
-				FontMetrics fm = g2d.getFontMetrics();
-				int x = (getWidth() - fm.stringWidth(getText())) / 2;
-				int y = (getHeight() + fm.getAscent() - fm.getDescent()) / 2;
-				g2d.drawString(getText(), x, y);
-
 				g2d.dispose();
+
+				super.paintComponent(g); // draw text + icon
 			}
 		};
 
@@ -239,6 +268,12 @@ public class Dashboard extends JFrame {
 		btn.setFocusPainted(false);
 		btn.setBorderPainted(false);
 		btn.setContentAreaFilled(false);
+		btn.setForeground(Color.WHITE);
+
+		// 👇 ICON POSITION SETTINGS
+		btn.setHorizontalTextPosition(SwingConstants.CENTER);
+		btn.setVerticalTextPosition(SwingConstants.BOTTOM);
+
 		btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
 
 		return btn;
@@ -247,40 +282,40 @@ public class Dashboard extends JFrame {
 	// 🔹 Create welcome card
 	private JPanel createWelcomeCard() {
 
-	    URL url = getClass().getResource("/Smile_Care.png");
+		URL url = getClass().getResource("/Smile_Care.png");
 
-	    if (url == null) {
-	        System.out.println("Banner not found! Check path.");
-	        
-	        // return empty panel to avoid crash
-	        JPanel fallback = new JPanel();
-	        fallback.setPreferredSize(new Dimension(800, 200));
-	        fallback.setBackground(Color.LIGHT_GRAY);
-	        return fallback;
-	    }
+		if (url == null) {
+			System.out.println("Banner not found! Check path.");
 
-	    ImageIcon bgIcon = new ImageIcon(url);
-	    Image bgImage = bgIcon.getImage();
+			// return empty panel to avoid crash
+			JPanel fallback = new JPanel();
+			fallback.setPreferredSize(new Dimension(800, 200));
+			fallback.setBackground(Color.LIGHT_GRAY);
+			return fallback;
+		}
 
-	    JPanel card = new JPanel() {
-	        @Override
-	        protected void paintComponent(Graphics g) {
-	            super.paintComponent(g);
+		ImageIcon bgIcon = new ImageIcon(url);
+		Image bgImage = bgIcon.getImage();
 
-	            Graphics2D g2d = (Graphics2D) g.create();
-	            g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+		JPanel card = new JPanel() {
+			@Override
+			protected void paintComponent(Graphics g) {
+				super.paintComponent(g);
 
-	            // Draw full wallpaper
-	            g2d.drawImage(bgImage, 0, 0, getWidth(), getHeight(), this);
+				Graphics2D g2d = (Graphics2D) g.create();
+				g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
 
-	            g2d.dispose();
-	        }
-	    };
+				// Draw full wallpaper
+				g2d.drawImage(bgImage, 0, 0, getWidth(), getHeight(), this);
 
-	    card.setLayout(new BorderLayout());
-	    card.setOpaque(false);
+				g2d.dispose();
+			}
+		};
 
-	    return card;
+		card.setLayout(new BorderLayout());
+		card.setOpaque(false);
+
+		return card;
 	}
 
 	// 🔹 Create individual stat card

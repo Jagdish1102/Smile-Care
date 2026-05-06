@@ -1,12 +1,14 @@
 package UI;
 
-import dhule_Hospital_database.DBConnection;
 
 import javax.swing.*;
 import javax.swing.Timer;
 import javax.swing.border.*;
 import javax.swing.event.TableModelEvent;
 import javax.swing.table.*;
+
+import dhule_Hospital_database.DBConnection;
+
 import java.awt.*;
 import java.awt.event.*;
 import java.sql.*;
@@ -77,7 +79,6 @@ public class MedicineManager extends JFrame {
         }
     }
 
-    // ✅ FIX: Added 'content' field (weight+unit like "500mg", "10ml")
     private static class TemplateMedicine {
         String form, drugName, content, instruction;
         int quantity;
@@ -210,6 +211,7 @@ public class MedicineManager extends JFrame {
         tabs.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         tabs.addTab(" Medicine Inventory ",       createMedicineMasterPanel());
         tabs.addTab(" Prescription Templates ",   createTemplatePanel());
+        tabs.addTab(" Manage Instructions ",      createInstructionPanel());
 
         add(tabs, BorderLayout.CENTER);
         add(createFooterPanel(), BorderLayout.SOUTH);
@@ -254,6 +256,258 @@ public class MedicineManager extends JFrame {
 
         return header;
     }
+
+    // ==================== INSTRUCTION PANEL ====================
+
+    private JPanel createInstructionPanel() {
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+        panel.setBackground(Color.WHITE);
+        panel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+
+        DefaultTableModel model = new DefaultTableModel(
+                new String[]{"ID", "English", "Hindi", "Marathi"}, 0) {
+            @Override
+            public boolean isCellEditable(int row, int col) {
+                // ID column is not editable; all text columns are
+                return col != 0;
+            }
+        };
+
+        JTable table = new JTable(model);
+        table.setRowHeight(35);
+        // Hide the ID column
+        table.getColumnModel().getColumn(0).setMinWidth(0);
+        table.getColumnModel().getColumn(0).setMaxWidth(0);
+
+        loadInstructions(model);
+
+        // Wire inline-edit saves: whenever the user edits a cell directly in the table,
+        // persist the change to the DB immediately.
+        model.addTableModelListener(e -> {
+            if (e.getType() == TableModelEvent.UPDATE) {
+                int row = e.getFirstRow();
+                if (row >= 0 && row < model.getRowCount()) {
+                    saveInstructionInline(model, row);
+                }
+            }
+        });
+
+        // ===== TOP BUTTON PANEL =====
+        JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
+        topPanel.setBackground(new Color(245, 245, 250));
+
+        JButton addBtn    = createActionButton("Add Instruction",    SUCCESS);
+        JButton updateBtn = createActionButton("Update Selected",    PRIMARY);
+        JButton deleteBtn = createActionButton("Delete Selected",    DANGER);
+
+        // ---- Add: opens a dialog to enter EN / HI / MR, then calls addInstruction(en,hi,mr)
+        addBtn.addActionListener(e -> showAddInstructionDialog(model));
+
+        // ---- Update: opens a pre-filled dialog for the selected row, then calls updateInstruction(id,en,hi,mr)
+        updateBtn.addActionListener(e -> showUpdateInstructionDialog(table, model));
+
+        // ---- Delete: confirms, then calls deleteInstruction(id) and removes the row from the model
+        deleteBtn.addActionListener(e -> showDeleteInstructionDialog(table, model));
+
+        topPanel.add(addBtn);
+        topPanel.add(updateBtn);
+        topPanel.add(deleteBtn);
+
+        panel.add(topPanel,              BorderLayout.NORTH);
+        panel.add(new JScrollPane(table), BorderLayout.CENTER);
+
+        return panel;
+    }
+
+    // ---- Dialog wrapper: Add ----
+    private void showAddInstructionDialog(DefaultTableModel model) {
+        JPanel form = new JPanel(new GridBagLayout());
+        form.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(8, 8, 8, 8);
+        gbc.fill   = GridBagConstraints.HORIZONTAL;
+
+        JTextField enField = new JTextField(30);
+        JTextField hiField = new JTextField(30);
+        JTextField mrField = new JTextField(30);
+
+        gbc.gridx = 0; gbc.gridy = 0; form.add(new JLabel("English:*"), gbc);
+        gbc.gridx = 1;                form.add(enField, gbc);
+        gbc.gridx = 0; gbc.gridy = 1; form.add(new JLabel("Hindi:"),   gbc);
+        gbc.gridx = 1;                form.add(hiField, gbc);
+        gbc.gridx = 0; gbc.gridy = 2; form.add(new JLabel("Marathi:"), gbc);
+        gbc.gridx = 1;                form.add(mrField, gbc);
+
+        int result = JOptionPane.showConfirmDialog(this, form,
+                "Add Instruction", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+
+        if (result == JOptionPane.OK_OPTION) {
+            addInstruction(enField.getText().trim(),
+                           hiField.getText().trim(),
+                           mrField.getText().trim());
+            loadInstructions(model);   // refresh table after insert
+        }
+    }
+
+    // ---- Dialog wrapper: Update ----
+    private void showUpdateInstructionDialog(JTable table, DefaultTableModel model) {
+        int row = table.getSelectedRow();
+        if (row == -1) {
+            showToast("Please select an instruction to update");
+            return;
+        }
+        int modelRow = table.convertRowIndexToModel(row);
+        int id       = (int)    model.getValueAt(modelRow, 0);
+        String curEn = (String) model.getValueAt(modelRow, 1);
+        String curHi = (String) model.getValueAt(modelRow, 2);
+        String curMr = (String) model.getValueAt(modelRow, 3);
+
+        JPanel form = new JPanel(new GridBagLayout());
+        form.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(8, 8, 8, 8);
+        gbc.fill   = GridBagConstraints.HORIZONTAL;
+
+        JTextField enField = new JTextField(curEn != null ? curEn : "", 30);
+        JTextField hiField = new JTextField(curHi != null ? curHi : "", 30);
+        JTextField mrField = new JTextField(curMr != null ? curMr : "", 30);
+
+        gbc.gridx = 0; gbc.gridy = 0; form.add(new JLabel("English:*"), gbc);
+        gbc.gridx = 1;                form.add(enField, gbc);
+        gbc.gridx = 0; gbc.gridy = 1; form.add(new JLabel("Hindi:"),   gbc);
+        gbc.gridx = 1;                form.add(hiField, gbc);
+        gbc.gridx = 0; gbc.gridy = 2; form.add(new JLabel("Marathi:"), gbc);
+        gbc.gridx = 1;                form.add(mrField, gbc);
+
+        int result = JOptionPane.showConfirmDialog(this, form,
+                "Update Instruction", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+
+        if (result == JOptionPane.OK_OPTION) {
+            updateInstruction(id,
+                              enField.getText().trim(),
+                              hiField.getText().trim(),
+                              mrField.getText().trim());
+            loadInstructions(model);   // refresh table after update
+        }
+    }
+
+    // ---- Dialog wrapper: Delete ----
+    private void showDeleteInstructionDialog(JTable table, DefaultTableModel model) {
+        int row = table.getSelectedRow();
+        if (row == -1) {
+            showToast("Please select an instruction to delete");
+            return;
+        }
+        int modelRow = table.convertRowIndexToModel(row);
+        int id       = (int) model.getValueAt(modelRow, 0);
+
+        deleteInstruction(id);         // handles its own confirm dialog
+        loadInstructions(model);       // refresh table after delete
+    }
+
+    // ==================== INSTRUCTION DB METHODS ====================
+
+    private void deleteInstruction(int id) {
+        int confirm = JOptionPane.showConfirmDialog(this,
+                "Delete this instruction?",
+                "Confirm",
+                JOptionPane.YES_NO_OPTION);
+
+        if (confirm != JOptionPane.YES_OPTION) return;
+
+        String sql = "DELETE FROM instruction_master WHERE id=?";
+
+        try (Connection conn = DBConnection.connect();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, id);
+            ps.executeUpdate();
+
+            invalidateInstructionCache();
+            showToast("Instruction deleted");
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            showToast("Error deleting instruction");
+        }
+    }
+
+    private void updateInstruction(int id, String en, String hi, String mr) {
+        String sql = "UPDATE instruction_master " +
+                     "SET instruction_en=?, instruction_hi=?, instruction_mr=? WHERE id=?";
+
+        try (Connection conn = DBConnection.connect();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setString(1, en);
+            ps.setString(2, hi);
+            ps.setString(3, mr);
+            ps.setInt(4, id);
+
+            ps.executeUpdate();
+
+            invalidateInstructionCache();
+            showToast("Instruction updated");
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            showToast("Error updating instruction");
+        }
+    }
+
+    private void addInstruction(String en, String hi, String mr) {
+        if (en.isEmpty()) {
+            showToast("English instruction required");
+            return;
+        }
+
+        String sql = "INSERT INTO instruction_master " +
+                     "(instruction_en, instruction_hi, instruction_mr) VALUES (?, ?, ?)";
+
+        try (Connection conn = DBConnection.connect();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setString(1, en);
+            ps.setString(2, hi);
+            ps.setString(3, mr);
+
+            ps.executeUpdate();
+
+            invalidateInstructionCache();
+            showToast("Instruction added");
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            showToast("Error adding instruction");
+        }
+    }
+
+    private void loadInstructions(DefaultTableModel model) {
+        model.setRowCount(0);
+
+        String sql = "SELECT id, instruction_en, instruction_hi, instruction_mr " +
+                     "FROM instruction_master ORDER BY id";
+
+        try (Connection conn = DBConnection.connect();
+             Statement stmt = conn.createStatement();
+             ResultSet rs   = stmt.executeQuery(sql)) {
+
+            while (rs.next()) {
+                model.addRow(new Object[]{
+                        rs.getInt("id"),
+                        rs.getString("instruction_en"),
+                        rs.getString("instruction_hi"),
+                        rs.getString("instruction_mr")
+                });
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            showToast("Error loading instructions");
+        }
+    }
+
+    // ==================== NAV / ACTION BUTTON HELPERS ====================
 
     private JButton createNavButton(String text) {
         JButton btn = new JButton(text);
@@ -336,7 +590,6 @@ public class MedicineManager extends JFrame {
         gbc.gridx = 5; gbc.weightx = 0;
         toolbar.add(searchField, gbc);
 
-        // ✅ FIX: Added "Content" column to medicine table
         medicineModel = new DefaultTableModel(
             new String[]{"ID", "Drug Form", "Trade Name", "Content", "Weight", "Unit", "Company", "Generic Name"}, 0) {
             @Override
@@ -425,7 +678,7 @@ public class MedicineManager extends JFrame {
             public void keyReleased(KeyEvent e) { debounceTemplateFilter(); }
         });
 
-        searchPanel.add(searchLabel,       BorderLayout.WEST);
+        searchPanel.add(searchLabel,        BorderLayout.WEST);
         searchPanel.add(templateSearchField, BorderLayout.CENTER);
         leftPanel.add(searchPanel, BorderLayout.NORTH);
 
@@ -640,7 +893,7 @@ public class MedicineManager extends JFrame {
         totalLabel.setForeground(RX_HEADER_BG);
         totalLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 80));
 
-        row.add(rxLabel,   BorderLayout.WEST);
+        row.add(rxLabel,    BorderLayout.WEST);
         row.add(totalLabel, BorderLayout.EAST);
 
         return row;
@@ -670,7 +923,7 @@ public class MedicineManager extends JFrame {
         drugLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
         detailsPanel.add(drugLabel);
 
-        // ✅ Line 3: Content (weight like "500mg", "10ml") — NOT strength label
+        // Line 3: Content (weight like "500mg", "10ml")
         if (!tm.content.isEmpty()) {
             JLabel contentLabel = new JLabel(tm.content);
             contentLabel.setFont(new Font("Segoe UI", Font.PLAIN, 13));
@@ -849,8 +1102,8 @@ public class MedicineManager extends JFrame {
         buttonPanel.add(saveBtn);
         buttonPanel.add(cancelBtn);
 
-        editDialog.add(formPanel,    BorderLayout.CENTER);
-        editDialog.add(buttonPanel,  BorderLayout.SOUTH);
+        editDialog.add(formPanel,   BorderLayout.CENTER);
+        editDialog.add(buttonPanel, BorderLayout.SOUTH);
         editDialog.setVisible(true);
     }
 
@@ -890,7 +1143,6 @@ public class MedicineManager extends JFrame {
             "Search by trade name or generic name...");
         searchPanel.add(selectorSearch, BorderLayout.CENTER);
 
-        // ✅ FIX: Added "Content" column in selector table
         DefaultTableModel selectorModel = new DefaultTableModel(
             new String[]{"ID", "Form", "Trade Name", "Content", "Weight", "Unit", "Company", "Generic"}, 0) {
             @Override
@@ -914,7 +1166,6 @@ public class MedicineManager extends JFrame {
             }
         });
 
-        // ✅ FIX: Fetch both content AND weight+unit from medicines table
         Runnable loadData = () -> {
             selectorModel.setRowCount(0);
             String keyword = selectorSearch.getText().trim();
@@ -938,7 +1189,6 @@ public class MedicineManager extends JFrame {
                         String weight  = rs.getString("weight");
                         String unit    = rs.getString("unit");
 
-                        // ✅ Content column: use content field, fallback to weight+unit
                         String contentDisplay = (content != null && !content.trim().isEmpty())
                             ? content.trim()
                             : (weight != null && !weight.trim().isEmpty())
@@ -986,9 +1236,9 @@ public class MedicineManager extends JFrame {
         buttonPanel.add(selectBtn);
         buttonPanel.add(cancelBtn);
 
-        dialog.add(searchPanel,               BorderLayout.NORTH);
+        dialog.add(searchPanel,                BorderLayout.NORTH);
         dialog.add(new JScrollPane(selectorTable), BorderLayout.CENTER);
-        dialog.add(buttonPanel,               BorderLayout.SOUTH);
+        dialog.add(buttonPanel,                BorderLayout.SOUTH);
 
         loadData.run();
         dialog.setVisible(true);
@@ -1001,11 +1251,10 @@ public class MedicineManager extends JFrame {
             return;
         }
 
-        int modelRow  = table.convertRowIndexToModel(row);
-        String drugForm   = (String) model.getValueAt(modelRow, 1);
-        String tradeName  = (String) model.getValueAt(modelRow, 2);
-        // ✅ FIX: column 3 is now "Content" (weight like "500mg")
-        String content    = (String) model.getValueAt(modelRow, 3);
+        int modelRow     = table.convertRowIndexToModel(row);
+        String drugForm  = (String) model.getValueAt(modelRow, 1);
+        String tradeName = (String) model.getValueAt(modelRow, 2);
+        String content   = (String) model.getValueAt(modelRow, 3);
         if (content == null) content = "";
 
         JPanel inputPanel = new JPanel(new GridBagLayout());
@@ -1051,7 +1300,6 @@ public class MedicineManager extends JFrame {
                 String instruction = (String) instCombo.getSelectedItem();
                 if (instruction == null) instruction = "";
 
-                // ✅ FIX: Pass content (not strength) into TemplateMedicine
                 TemplateMedicine tm = new TemplateMedicine(
                     drugForm, tradeName, finalContent, instruction, quantity);
                 templateList.add(tm);
@@ -1160,7 +1408,6 @@ public class MedicineManager extends JFrame {
 
             templateList.clear();
 
-            // ✅ FIX: Read "total" column as content (that's what DBSetup creates)
             try (PreparedStatement ps2 = conn.prepareStatement(
                     "SELECT form, drug_name, total, instruction, quantity " +
                     "FROM template_details WHERE template_id=? ORDER BY id")) {
@@ -1169,7 +1416,7 @@ public class MedicineManager extends JFrame {
                     while (rs2.next()) {
                         String form        = rs2.getString("form");
                         String drugName    = rs2.getString("drug_name");
-                        String content     = rs2.getString("total");       // ✅ total = content
+                        String content     = rs2.getString("total");
                         String instruction = rs2.getString("instruction");
                         int    quantity    = rs2.getInt("quantity");
                         if (quantity <= 0) quantity = 10;
@@ -1229,7 +1476,6 @@ public class MedicineManager extends JFrame {
                 }
             }
 
-            // ✅ FIX: Save tm.content into "total" column (the actual DB column name)
             try (PreparedStatement insPs = conn.prepareStatement(
                     "INSERT INTO template_details" +
                     "(template_id, form, drug_name, total, instruction, quantity) " +
@@ -1238,7 +1484,7 @@ public class MedicineManager extends JFrame {
                     insPs.setInt(1, currentTemplateId);
                     insPs.setString(2, tm.form);
                     insPs.setString(3, tm.drugName);
-                    insPs.setString(4, tm.content);       // ✅ content → total column
+                    insPs.setString(4, tm.content);
                     insPs.setString(5, tm.instruction);
                     insPs.setInt(6, tm.quantity);
                     insPs.addBatch();
@@ -1255,13 +1501,10 @@ public class MedicineManager extends JFrame {
         }
     }
 
-    // ✅ FIX: Ensure all needed columns exist (no "strength" — use "total")
     private void ensureColumnsExist(Connection conn) {
         try (Statement st = conn.createStatement()) {
-            // quantity column in template_details
             try { st.execute("ALTER TABLE template_details ADD COLUMN quantity INTEGER DEFAULT 10"); }
             catch (SQLException ignored) {}
-            // advice column in prescription_templates
             try { st.execute("ALTER TABLE prescription_templates ADD COLUMN advice TEXT"); }
             catch (SQLException ignored) {}
         } catch (SQLException e) {
@@ -1327,7 +1570,6 @@ public class MedicineManager extends JFrame {
 
     private void loadMedicines() {
         medicineModel.setRowCount(0);
-        // ✅ FIX: Also select content column
         String sql = "SELECT id, drug_form, trade_name, content, weight, unit, company, generic_name " +
                      "FROM medicines ORDER BY trade_name";
         try (Connection conn = DBConnection.connect();
@@ -1372,15 +1614,15 @@ public class MedicineManager extends JFrame {
     }
 
     private void saveInlineEdit(int row) {
-        int modelRow    = medicineTable.convertRowIndexToModel(row);
-        int id          = (int)    medicineModel.getValueAt(modelRow, 0);
-        String drugForm = (String) medicineModel.getValueAt(modelRow, 1);
-        String tradeName= (String) medicineModel.getValueAt(modelRow, 2);
-        String content  = (String) medicineModel.getValueAt(modelRow, 3);
-        String weight   = (String) medicineModel.getValueAt(modelRow, 4);
-        String unit     = (String) medicineModel.getValueAt(modelRow, 5);
-        String company  = (String) medicineModel.getValueAt(modelRow, 6);
-        String generic  = (String) medicineModel.getValueAt(modelRow, 7);
+        int modelRow     = medicineTable.convertRowIndexToModel(row);
+        int id           = (int)    medicineModel.getValueAt(modelRow, 0);
+        String drugForm  = (String) medicineModel.getValueAt(modelRow, 1);
+        String tradeName = (String) medicineModel.getValueAt(modelRow, 2);
+        String content   = (String) medicineModel.getValueAt(modelRow, 3);
+        String weight    = (String) medicineModel.getValueAt(modelRow, 4);
+        String unit      = (String) medicineModel.getValueAt(modelRow, 5);
+        String company   = (String) medicineModel.getValueAt(modelRow, 6);
+        String generic   = (String) medicineModel.getValueAt(modelRow, 7);
 
         String sql = "UPDATE medicines SET drug_form=?, trade_name=?, content=?, " +
                      "weight=?, unit=?, company=?, generic_name=? WHERE id=?";
@@ -1400,6 +1642,17 @@ public class MedicineManager extends JFrame {
         }
     }
 
+    private void saveInstructionInline(DefaultTableModel model, int row) {
+        int id     = (int)    model.getValueAt(row, 0);
+        String en  = (String) model.getValueAt(row, 1);
+        String hi  = (String) model.getValueAt(row, 2);
+        String mr  = (String) model.getValueAt(row, 3);
+
+        updateInstruction(id, en != null ? en : "",
+                              hi != null ? hi : "",
+                              mr != null ? mr : "");
+    }
+
     private void showAddMedicineDialog() {
         JDialog dialog = new JDialog(this, "Add New Medicine", true);
         dialog.setSize(600, 600);
@@ -1414,7 +1667,7 @@ public class MedicineManager extends JFrame {
 
         JTextField drugFormField  = new JTextField();
         JTextField tradeNameField = new JTextField();
-        JTextField contentField   = new JTextField();   // ✅ content = "500mg", "10ml" etc.
+        JTextField contentField   = new JTextField();
         JTextField weightField    = new JTextField();
         JComboBox<String> unitCombo = new JComboBox<>(new String[]{"mg", "g", "ml", "mcg", "IU"});
         JTextField companyField   = new JTextField();
@@ -1423,7 +1676,7 @@ public class MedicineManager extends JFrame {
 
         addFormField(form, gbc, "Drug Form:",     drugFormField,  0);
         addFormField(form, gbc, "Trade Name:*",   tradeNameField, 1);
-        addFormField(form, gbc, "Content:",       contentField,   2);   // ✅ e.g. 500mg
+        addFormField(form, gbc, "Content:",       contentField,   2);
         addFormField(form, gbc, "Weight:",        weightField,    3);
         addFormField(form, gbc, "Unit:",          unitCombo,      4);
         addFormField(form, gbc, "Company:",       companyField,   5);
@@ -1447,7 +1700,7 @@ public class MedicineManager extends JFrame {
                  PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setString(1, drugFormField.getText());
                 ps.setString(2, tradeNameField.getText());
-                ps.setString(3, contentField.getText());    // ✅ save content
+                ps.setString(3, contentField.getText());
                 ps.setString(4, weightField.getText());
                 ps.setString(5, (String) unitCombo.getSelectedItem());
                 ps.setString(6, companyField.getText());
@@ -1620,7 +1873,6 @@ public class MedicineManager extends JFrame {
 
     // ==================== HELPER: INSTRUCTION COMBO ====================
 
-    // ✅ Centralised helper — builds a properly-sized, Devanagari-ready combo box
     private JComboBox<String> buildInstructionCombo() {
         JComboBox<String> combo = new JComboBox<>();
         Font font = new Font("Nirmala UI", Font.PLAIN, 14);
@@ -1631,7 +1883,6 @@ public class MedicineManager extends JFrame {
             if (!text.isEmpty()) combo.addItem(text);
         }
 
-        // Auto-size width to longest item
         FontMetrics fm = combo.getFontMetrics(font);
         int maxWidth = 200;
         for (int i = 0; i < combo.getItemCount(); i++) {

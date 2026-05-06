@@ -9,6 +9,8 @@ import java.awt.*;
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.event.*;
+import java.awt.print.Printable;
+import java.awt.print.PrinterJob;
 import java.sql.*;
 import java.text.NumberFormat;
 import java.time.LocalDate;
@@ -315,10 +317,10 @@ public class ViewBills extends JFrame {
 		JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
 		rightPanel.setOpaque(false);
 
-		refreshBtn = createStyledButton("🔄 Refresh", new Color(149, 165, 166), 100, 40);
-		printBtn = createStyledButton("🖨 Print", INFO_COLOR, 100, 40);
-		deleteBtn = createStyledButton("🗑 Delete Selected", DANGER_COLOR, 130, 40);
-		exportBtn = createStyledButton("📊 Export", SUCCESS_COLOR, 100, 40);
+		refreshBtn = createStyledButton(" Refresh", new Color(149, 165, 166), 100, 40);
+		printBtn = createStyledButton(" Print", INFO_COLOR, 100, 40);
+		deleteBtn = createStyledButton(" Delete Selected", DANGER_COLOR, 130, 40);
+		exportBtn = createStyledButton(" Export", SUCCESS_COLOR, 100, 40);
 		backBtn = createStyledButton("← Back", DARK_COLOR, 100, 40);
 
 		// Add tooltips
@@ -835,28 +837,71 @@ public class ViewBills extends JFrame {
 	}
 
 	private void printSelectedBill() {
-		int[] selectedRows = getSelectedRows();
-		if (selectedRows.length == 0) {
-			showStatusMessage("Please select a bill to print", WARNING_COLOR);
-			return;
-		}
+	    int[] selectedRows = getSelectedRows();
 
-		if (selectedRows.length > 1) {
-			showStatusMessage("Please select only one bill to print", WARNING_COLOR);
-			return;
-		}
+	    if (selectedRows.length == 0) {
+	        showStatusMessage("Please select a bill to print", WARNING_COLOR);
+	        return;
+	    }
 
-		try {
-			boolean complete = table.print(JTable.PrintMode.FIT_WIDTH);
-			if (complete) {
-				showStatusMessage("Bill sent to printer", SUCCESS_COLOR);
-			} else {
-				showStatusMessage("Printing cancelled", WARNING_COLOR);
-			}
-		} catch (Exception e) {
-			showStatusMessage("Error printing bill", DANGER_COLOR);
-			e.printStackTrace();
-		}
+	    if (selectedRows.length > 1) {
+	        showStatusMessage("Please select only one bill", WARNING_COLOR);
+	        return;
+	    }
+
+	    int row = selectedRows[0];
+
+	    int id = (int) model.getValueAt(row, 1);
+	    String name = (String) model.getValueAt(row, 2);
+	    double amount = (double) model.getValueAt(row, 3);
+	    String date = (String) model.getValueAt(row, 4);
+	    String time = (String) model.getValueAt(row, 5);
+
+	    PrinterJob job = PrinterJob.getPrinterJob();
+
+	    job.setPrintable((graphics, pageFormat, pageIndex) -> {
+	        if (pageIndex > 0) return Printable.NO_SUCH_PAGE;
+
+	        Graphics2D g2 = (Graphics2D) graphics;
+	        g2.translate(pageFormat.getImageableX(), pageFormat.getImageableY());
+
+	        int y = 20;
+
+	        g2.setFont(new Font("Monospaced", Font.BOLD, 14));
+	        g2.drawString("Smile Care Dental Clinic", 100, y);
+	        y += 20;
+
+	        g2.setFont(new Font("Monospaced", Font.PLAIN, 12));
+	        g2.drawString("-------------------------------------", 50, y);
+	        y += 20;
+
+	        g2.drawString("Bill ID     : " + id, 50, y); y += 20;
+	        g2.drawString("Patient     : " + name, 50, y); y += 20;
+	        g2.drawString("Amount      : ₹" + amount, 50, y); y += 20;
+	        g2.drawString("Date        : " + date, 50, y); y += 20;
+	        g2.drawString("Time        : " + time, 50, y); y += 20;
+
+	        y += 10;
+	        g2.drawString("-------------------------------------", 50, y);
+	        y += 20;
+
+	        g2.setFont(new Font("Monospaced", Font.BOLD, 12));
+	        g2.drawString("Thank You! Visit Again", 80, y);
+
+	        return Printable.PAGE_EXISTS;
+	    });
+
+	    boolean doPrint = job.printDialog();
+
+	    if (doPrint) {
+	        try {
+	            job.print();
+	            showStatusMessage("Bill printed successfully", SUCCESS_COLOR);
+	        } catch (Exception e) {
+	            e.printStackTrace();
+	            showStatusMessage("Printing failed", DANGER_COLOR);
+	        }
+	    }
 	}
 
 	private int[] getSelectedRows() {

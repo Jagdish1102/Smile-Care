@@ -1,18 +1,62 @@
 package UI;  
 
-import dao.PatientDAO;
-import model.Patient;
-import util.UppercaseDocumentFilter;
-
-import javax.swing.*;
-import javax.swing.border.*;
-import javax.swing.text.AbstractDocument;
-
-import java.awt.*;
-import java.awt.event.*;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Cursor;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.GradientPaint;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.GridLayout;
+import java.awt.Insets;
+import java.awt.RenderingHints;
+import java.awt.event.ActionEvent;
+import java.awt.event.FocusAdapter;
+import java.awt.event.FocusEvent;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+
+import javax.swing.AbstractAction;
+import javax.swing.Action;
+import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.JButton;
+import javax.swing.JComboBox;
+import javax.swing.JComponent;
+import javax.swing.JDialog;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JSeparator;
+import javax.swing.JTextField;
+import javax.swing.KeyStroke;
+import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
+import javax.swing.SwingWorker;
+import javax.swing.Timer;
+import javax.swing.UIManager;
+import javax.swing.border.Border;
+import javax.swing.text.AbstractDocument;
+
+import dao.PatientDAO;
+import model.Patient;
 import util.AppResources;
+import util.UppercaseDocumentFilter;
+
+
+
+
 
 public class AddPatientForm extends JFrame {
 
@@ -23,6 +67,7 @@ public class AddPatientForm extends JFrame {
     private JButton saveBtn, viewBtn, backBtn;
     private JPanel formPanel;
     private JButton prescriptionBtn;
+    private JTextField phone2Field;
     
     // Store the last saved patient name for quick prescription access
     private String lastSavedPatientName = null;
@@ -186,125 +231,124 @@ public class AddPatientForm extends JFrame {
     private void setupFormFields() {
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(8, 10, 8, 10);
-        gbc.fill = GridBagConstraints.BOTH;
+        gbc.fill = GridBagConstraints.HORIZONTAL; // 🔥 important fix
         gbc.anchor = GridBagConstraints.WEST;
 
         Font labelFont = new Font("Segoe UI", Font.BOLD, 16);
         Font fieldFont = new Font("Segoe UI", Font.PLAIN, 16);
-        int labelWidth = 100;
+        int labelWidth = 110;
         int fieldHeight = 40;
         int row = 0;
 
-        // ROW 1: Full Name
+        // ================= ROW 1: FULL NAME =================
         gbc.gridy = row;
+
         gbc.gridx = 0;
         gbc.weightx = 0;
-        gbc.gridwidth = 1;
-
         JLabel nameLabel = new JLabel("Full Name:");
         nameLabel.setFont(labelFont);
         nameLabel.setPreferredSize(new Dimension(labelWidth, fieldHeight));
         formPanel.add(nameLabel, gbc);
 
         gbc.gridx = 1;
-        gbc.weightx = 1.0;
         gbc.gridwidth = 3;
+        gbc.weightx = 1.0;
         nameField = createSensitiveTextField("", fieldFont);
-        nameField.setPreferredSize(new Dimension(0, fieldHeight));
         formPanel.add(nameField, gbc);
 
         row++;
 
-        // ROW 2: Age and Gender
+        // ================= ROW 2: AGE + GENDER =================
         gbc.gridy = row;
-        gbc.gridx = 0;
-        gbc.weightx = 0;
         gbc.gridwidth = 1;
 
+        gbc.gridx = 0;
+        gbc.weightx = 0;
         JLabel ageLabel = new JLabel("Age:");
         ageLabel.setFont(labelFont);
-        ageLabel.setPreferredSize(new Dimension(labelWidth, fieldHeight));
         formPanel.add(ageLabel, gbc);
 
         gbc.gridx = 1;
         gbc.weightx = 0.2;
-        gbc.gridwidth = 1;
         ageField = createSensitiveTextField("", fieldFont);
-        ageField.setPreferredSize(new Dimension(100, fieldHeight));
         formPanel.add(ageField, gbc);
 
         gbc.gridx = 2;
         gbc.weightx = 0;
-        gbc.gridwidth = 1;
         JLabel genderLabel = new JLabel("Gender:");
         genderLabel.setFont(labelFont);
         formPanel.add(genderLabel, gbc);
 
         gbc.gridx = 3;
-        gbc.weightx = 0.5;
-        gbc.gridwidth = 1;
-        genderBox = new JComboBox<>(new String[] { "Select", "Male", "Female", "Other" });
+        gbc.weightx = 0.3; // 🔥 controlled width
+        genderBox = new JComboBox<>(new String[]{"Select", "Male", "Female", "Other"});
         genderBox.setFont(fieldFont);
-        genderBox.setPreferredSize(new Dimension(120, fieldHeight));
         genderBox.setBackground(Color.WHITE);
         formPanel.add(genderBox, gbc);
 
         row++;
 
-        // ROW 3: Phone Number and Address
+        // ================= ROW 3: PHONE + PHONE2 =================
         gbc.gridy = row;
+
         gbc.gridx = 0;
         gbc.weightx = 0;
-        gbc.gridwidth = 1;
-
         JLabel phoneLabel = new JLabel("Phone:");
         phoneLabel.setFont(labelFont);
-        phoneLabel.setPreferredSize(new Dimension(labelWidth, fieldHeight));
         formPanel.add(phoneLabel, gbc);
 
         gbc.gridx = 1;
-        gbc.weightx = 0.4;
-        gbc.gridwidth = 1;
+        gbc.weightx = 0.5;
         phoneField = createSensitiveTextField("", fieldFont);
-        phoneField.setPreferredSize(new Dimension(0, fieldHeight));
         formPanel.add(phoneField, gbc);
 
         gbc.gridx = 2;
         gbc.weightx = 0;
-        gbc.gridwidth = 1;
+        JLabel phone2Label = new JLabel("Phone 2:");
+        phone2Label.setFont(labelFont);
+        formPanel.add(phone2Label, gbc);
+
+        gbc.gridx = 3;
+        gbc.weightx = 0.5;
+        phone2Field = createSensitiveTextField("", fieldFont);
+        formPanel.add(phone2Field, gbc);
+
+        row++;
+
+        // ================= ROW 4: ADDRESS (FULL WIDTH) =================
+        gbc.gridy = row;
+
+        gbc.gridx = 0;
+        gbc.weightx = 0;
         JLabel addressLabel = new JLabel("Address:");
         addressLabel.setFont(labelFont);
         formPanel.add(addressLabel, gbc);
 
-        gbc.gridx = 3;
-        gbc.weightx = 0.6;
-        gbc.gridwidth = 1;
+        gbc.gridx = 1;
+        gbc.gridwidth = 3;
+        gbc.weightx = 1.0;
         addressField = createSensitiveTextField("", fieldFont);
-        addressField.setPreferredSize(new Dimension(0, fieldHeight));
         formPanel.add(addressField, gbc);
 
         row++;
 
-        // ROW 4: Symptoms/Email
+        // ================= ROW 5: SYMPTOMS =================
         gbc.gridy = row;
-        gbc.gridx = 0;
-        gbc.weightx = 0;
-        gbc.gridwidth = 1;
 
+        gbc.gridx = 0;
+        gbc.gridwidth = 1;
+        gbc.weightx = 0;
         JLabel diseaseLabel = new JLabel("Symptoms/Email:");
         diseaseLabel.setFont(labelFont);
-        diseaseLabel.setPreferredSize(new Dimension(labelWidth, fieldHeight));
         formPanel.add(diseaseLabel, gbc);
 
         gbc.gridx = 1;
-        gbc.weightx = 1.0;
         gbc.gridwidth = 3;
+        gbc.weightx = 1.0;
         diseaseField = createSensitiveTextField("", fieldFont);
-        diseaseField.setPreferredSize(new Dimension(0, fieldHeight));
         diseaseField.setToolTipText("Enter symptoms or email address");
         formPanel.add(diseaseField, gbc);
     }
-
     private JTextField createSensitiveTextField(String text, Font font) {
         JTextField tf = new JTextField(text);
 
@@ -554,11 +598,12 @@ public class AddPatientForm extends JFrame {
                 }
                 String gender = genderBox.getSelectedIndex() == 0 ? "" : genderBox.getSelectedItem().toString();
                 String phone = phoneField.getText().trim();
+                String phone2 = phone2Field.getText().trim();
                 String address = addressField.getText().trim().toUpperCase();
                 String disease = diseaseField.getText().trim().toUpperCase();
                 String date = LocalDate.now().toString();
 
-                Patient p = new Patient(name, age, gender, phone, address, disease, date);
+                Patient p = new Patient(name, age, gender, phone,phone2, address, disease, date);
                 boolean success = PatientDAO.addPatient(p);
                 
                 if (success) {
@@ -658,6 +703,7 @@ public class AddPatientForm extends JFrame {
         ageField.setText("");
         genderBox.setSelectedIndex(0);
         phoneField.setText("");
+        phone2Field.setText("");
         addressField.setText("");
         diseaseField.setText("");
         nameField.requestFocus();

@@ -1,20 +1,50 @@
 package UI;
 
-import model.QuotationItem;
-
-import javax.swing.*;
-import javax.swing.Timer;
-import javax.swing.border.*;
-import javax.swing.table.*;
-import java.awt.*;
-import java.awt.event.*;
-import java.awt.print.*;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Cursor;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.Graphics2D;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.Insets;
+import java.awt.Point;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.print.Printable;
+import java.awt.print.PrinterJob;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
-import java.util.*;
+import java.util.ArrayList;
 import java.util.List;
-import java.time.LocalDate;
+
+import javax.swing.BorderFactory;
+import javax.swing.JButton;
+import javax.swing.JComboBox;
+import javax.swing.JDialog;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JSpinner;
+import javax.swing.JTabbedPane;
+import javax.swing.JTable;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
+import javax.swing.SpinnerNumberModel;
+import javax.swing.SwingConstants;
+import javax.swing.Timer;
+import javax.swing.border.TitledBorder;
+import javax.swing.table.DefaultTableModel;
+
+import dhule_Hospital_database.DBConnection;
+import model.QuotationItem;
 
 /**
  * GenerateForms – Professional Document Generator
@@ -232,136 +262,164 @@ public class GenerateForms extends JDialog {
 
 	// ==================== QUOTATION PANEL ====================
 	private JPanel createQuotationPanel() {
-		JPanel panel = new JPanel(new BorderLayout(12, 12));
-		panel.setBackground(Color.WHITE);
-		panel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+	    JPanel panel = new JPanel(new BorderLayout(12, 12));
+	    panel.setBackground(Color.WHITE);
+	    panel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
 
-		// Top: Patient details
-		JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 10));
-		top.setBackground(C_BG);
-		top.setBorder(BorderFactory.createTitledBorder(BorderFactory.createLineBorder(C_BORDER), " Patient Details ",
-				TitledBorder.LEFT, TitledBorder.TOP, new Font(FONT_FAMILY, Font.BOLD, 13), C_PRIMARY));
-		top.add(createLabel("Patient Name:"));
-		patientNameFieldQ = createTextField(200);
-		top.add(patientNameFieldQ);
-		top.add(createLabel("Phone:"));
-		patientPhoneFieldQ = createTextField(150);
-		top.add(patientPhoneFieldQ);
-		panel.add(top, BorderLayout.NORTH);
+	    // Top: Patient details
+	    JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 10));
+	    top.setBackground(C_BG);
+	    top.setBorder(BorderFactory.createTitledBorder(
+	            BorderFactory.createLineBorder(C_BORDER),
+	            " Patient Details ",
+	            TitledBorder.LEFT,
+	            TitledBorder.TOP,
+	            new Font(FONT_FAMILY, Font.BOLD, 13),
+	            C_PRIMARY));
 
-		// Center: Items table
-		JPanel center = new JPanel(new BorderLayout(0, 8));
-		center.setBorder(
-				BorderFactory.createTitledBorder(BorderFactory.createLineBorder(C_BORDER), " Services / Items ",
-						TitledBorder.LEFT, TitledBorder.TOP, new Font(FONT_FAMILY, Font.BOLD, 13), C_PRIMARY));
+	    top.add(createLabel("Patient Name:"));
+	    patientNameFieldQ = createTextField(200);
+	    top.add(patientNameFieldQ);
 
-		// Add item bar
-		JPanel addBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 8));
-		addBar.setBackground(C_BG);
-		addBar.add(createLabel("Service:"));
-		serviceCombo = new JComboBox<>();
-		serviceCombo.setFont(new Font(FONT_FAMILY, Font.PLAIN, 13));
-		serviceCombo.setEditable(true);
-		serviceCombo.setPreferredSize(new Dimension(200, 32));
-		loadServices();
-		addBar.add(serviceCombo);
+	    top.add(createLabel("Phone:"));
+	    patientPhoneFieldQ = createTextField(150);
+	    top.add(patientPhoneFieldQ);
 
-		addBar.add(createLabel("Qty:"));
-		quantitySpinner = new JSpinner(new SpinnerNumberModel(1, 1, 999, 1));
-		quantitySpinner.setFont(new Font(FONT_FAMILY, Font.PLAIN, 13));
-		quantitySpinner.setPreferredSize(new Dimension(70, 32));
-		addBar.add(quantitySpinner);
+	    panel.add(top, BorderLayout.NORTH);
 
-		addBar.add(createLabel("Price (₹):"));
-		priceField = createTextField(100);
-		addBar.add(priceField);
+	    // ================= CENTER =================
+	    JPanel center = new JPanel(new BorderLayout(0, 8));
+	    center.setBorder(BorderFactory.createTitledBorder(
+	            BorderFactory.createLineBorder(C_BORDER),
+	            " Services / Items ",
+	            TitledBorder.LEFT,
+	            TitledBorder.TOP,
+	            new Font(FONT_FAMILY, Font.BOLD, 13),
+	            C_PRIMARY));
 
-		addItemBtn = createButton("➕ Add", C_SUCCESS, 100, 32);
-		addItemBtn.addActionListener(e -> addQuotationItem());
-		addBar.add(addItemBtn);
-		center.add(addBar, BorderLayout.NORTH);
+	    // ✅ FIX: Create addBar FIRST
+	    JPanel addBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 8));
+	    addBar.setBackground(C_BG);
 
-		// Table
-		quotationModel = new DefaultTableModel(new String[] { "Service", "Quantity", "Unit Price (₹)", "Total (₹)" },
-				0) {
-			@Override
-			public boolean isCellEditable(int row, int col) {
-				return col == 1 || col == 2;
-			}
-		};
-		quotationTable = new JTable(quotationModel);
-		quotationTable.setFont(new Font(FONT_FAMILY, Font.PLAIN, 13));
-		quotationTable.setRowHeight(35);
-		quotationTable.setSelectionBackground(new Color(187, 222, 251));
-		quotationTable.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
-		quotationTable.getTableHeader().setFont(new Font(FONT_FAMILY, Font.BOLD, 13));
-		quotationTable.getTableHeader().setBackground(C_PRIMARY);
-		quotationTable.getTableHeader().setForeground(Color.WHITE);
+	    // ================= SERVICE DROPDOWN =================
+	    addBar.add(createLabel("Service:"));
 
-		quotationModel.addTableModelListener(e -> {
-			if (e.getType() == javax.swing.event.TableModelEvent.UPDATE) {
-				int row = e.getFirstRow();
-				if (row >= 0)
-					updateQuotationItem(row);
-				calculateTotals();
-			}
-		});
+	    serviceCombo = new JComboBox<>();
+	    serviceCombo.setFont(new Font(FONT_FAMILY, Font.PLAIN, 13));
+	    serviceCombo.setEditable(true);
+	    serviceCombo.setPreferredSize(new Dimension(200, 32));
 
-		center.add(quotationTable, BorderLayout.CENTER);
+	    loadServices(); // DB se load
+	    addBar.add(serviceCombo);
 
-		JPanel actionBar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 8));
-		removeItemBtn = createButton("🗑️ Remove Selected", C_DANGER, 160, 32);
-		removeItemBtn.addActionListener(e -> removeQuotationItem());
-		actionBar.add(removeItemBtn);
-		center.add(actionBar, BorderLayout.SOUTH);
-		panel.add(center, BorderLayout.CENTER);
+	    // ================= DELETE BUTTON =================
+	    JButton deleteServiceBtn = createButton("❌ Delete", C_DANGER, 110, 32);
 
-		// Bottom: Summary + Terms + Buttons
-		JPanel bottom = new JPanel(new BorderLayout(10, 8));
-		bottom.setBackground(C_BG);
-		bottom.setBorder(BorderFactory.createTitledBorder(BorderFactory.createLineBorder(C_BORDER), " Summary ",
-				TitledBorder.LEFT, TitledBorder.TOP, new Font(FONT_FAMILY, Font.BOLD, 13), C_PRIMARY));
+	    deleteServiceBtn.addActionListener(e -> {
+	        String service = serviceCombo.getEditor().getItem().toString().trim();
 
-		JPanel totals = new JPanel(new FlowLayout(FlowLayout.LEFT, 20, 8));
-		totals.add(createLabel("Subtotal:"));
-		subtotalLabel = createLabel("₹ 0.00");
-		subtotalLabel.setFont(new Font(FONT_FAMILY, Font.BOLD, 14));
-		totals.add(subtotalLabel);
-		totals.add(createLabel("Tax (18% GST):"));
-		taxLabel = createLabel("₹ 0.00");
-		taxLabel.setFont(new Font(FONT_FAMILY, Font.BOLD, 14));
-		totals.add(taxLabel);
-		totals.add(createLabel("Grand Total:"));
-		totalLabel = createLabel("₹ 0.00");
-		totalLabel.setFont(new Font(FONT_FAMILY, Font.BOLD, 18));
-		totalLabel.setForeground(C_SUCCESS);
-		totals.add(totalLabel);
-		bottom.add(totals, BorderLayout.NORTH);
+	        if (service.isEmpty()) {
+	            showToast("Select service");
+	            return;
+	        }
 
-		JPanel termsPanel = new JPanel(new BorderLayout(8, 0));
-		termsPanel.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 10));
-		termsPanel.add(createLabel("Terms:"), BorderLayout.WEST);
-		termsArea = new JTextArea(2, 60);
-		termsArea.setFont(new Font(FONT_FAMILY, Font.PLAIN, 12));
-		termsArea.setText(
-				"1. Payment due within 15 days\n2. Subject to local jurisdiction\n3. Thank you for choosing Smile Care!");
-		termsArea.setLineWrap(true);
-		termsArea.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(C_BORDER),
-				BorderFactory.createEmptyBorder(6, 8, 6, 8)));
-		termsPanel.add(termsArea, BorderLayout.CENTER);
-		bottom.add(termsPanel, BorderLayout.CENTER);
+	        int confirm = JOptionPane.showConfirmDialog(
+	                this,
+	                "Delete service: " + service + " ?",
+	                "Confirm",
+	                JOptionPane.YES_NO_OPTION
+	        );
 
-		JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 10));
-		generateQuotationBtn = createButton("💰 Generate Quotation", C_SUCCESS, 200, 42);
-		generateQuotationBtn.addActionListener(e -> generateQuotation());
-		btnPanel.add(generateQuotationBtn);
-		printQuotationBtn = createButton("🖨️ Print Quotation", C_PRIMARY, 180, 42);
-		printQuotationBtn.addActionListener(e -> printQuotation());
-		btnPanel.add(printQuotationBtn);
-		bottom.add(btnPanel, BorderLayout.SOUTH);
+	        if (confirm == JOptionPane.YES_OPTION) {
+	            deleteService(service);
+	            loadServices();
+	            showToast("Deleted");
+	        }
+	    });
 
-		panel.add(bottom, BorderLayout.SOUTH);
-		return panel;
+	    addBar.add(deleteServiceBtn);
+
+	    // ================= QTY =================
+	    addBar.add(createLabel("Qty:"));
+	    quantitySpinner = new JSpinner(new SpinnerNumberModel(1, 1, 999, 1));
+	    quantitySpinner.setPreferredSize(new Dimension(70, 32));
+	    addBar.add(quantitySpinner);
+
+	    // ================= PRICE =================
+	    addBar.add(createLabel("Price (₹):"));
+	    priceField = createTextField(100);
+	    addBar.add(priceField);
+
+	    // ================= ADD BUTTON =================
+	    addItemBtn = createButton("➕ Add", C_SUCCESS, 100, 32);
+	    addItemBtn.addActionListener(e -> addQuotationItem());
+	    addBar.add(addItemBtn);
+
+	    center.add(addBar, BorderLayout.NORTH);
+
+	    // ================= TABLE =================
+	    quotationModel = new DefaultTableModel(
+	            new String[]{"Service", "Quantity", "Unit Price (₹)", "Total (₹)"}, 0) {
+	        @Override
+	        public boolean isCellEditable(int row, int col) {
+	            return col == 1 || col == 2;
+	        }
+	    };
+
+	    quotationTable = new JTable(quotationModel);
+	    quotationTable.setRowHeight(35);
+
+	    quotationModel.addTableModelListener(e -> {
+	        if (e.getType() == javax.swing.event.TableModelEvent.UPDATE) {
+	            int row = e.getFirstRow();
+	            if (row >= 0) updateQuotationItem(row);
+	            calculateTotals();
+	        }
+	    });
+
+	    center.add(quotationTable, BorderLayout.CENTER);
+
+	    // ================= REMOVE ITEM =================
+	    JPanel actionBar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 8));
+	    removeItemBtn = createButton("🗑️ Remove Selected", C_DANGER, 160, 32);
+	    removeItemBtn.addActionListener(e -> removeQuotationItem());
+	    actionBar.add(removeItemBtn);
+
+	    center.add(actionBar, BorderLayout.SOUTH);
+	    panel.add(center, BorderLayout.CENTER);
+
+	    // ================= BOTTOM =================
+	    JPanel bottom = new JPanel(new BorderLayout(10, 8));
+	    bottom.setBackground(C_BG);
+
+	    JPanel totals = new JPanel(new FlowLayout(FlowLayout.LEFT, 20, 8));
+	    totals.add(createLabel("Subtotal:"));
+	    subtotalLabel = createLabel("₹ 0.00");
+	    totals.add(subtotalLabel);
+
+	    totals.add(createLabel("Grand Total:"));
+	    totalLabel = createLabel("₹ 0.00");
+	    totalLabel.setForeground(C_SUCCESS);
+	    totals.add(totalLabel);
+
+	    bottom.add(totals, BorderLayout.NORTH);
+
+	    JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 10));
+
+	    generateQuotationBtn = createButton("Generate", C_SUCCESS, 200, 42);
+	    generateQuotationBtn.addActionListener(e -> generateQuotation());
+
+	    printQuotationBtn = createButton("Print", C_PRIMARY, 180, 42);
+	    printQuotationBtn.addActionListener(e -> printQuotation());
+
+	    btnPanel.add(generateQuotationBtn);
+	    btnPanel.add(printQuotationBtn);
+
+	    bottom.add(btnPanel, BorderLayout.SOUTH);
+
+	    panel.add(bottom, BorderLayout.SOUTH);
+
+	    return panel;
 	}
 
 	// ==================== MEDICAL CERTIFICATE LOGIC ====================
@@ -418,39 +476,97 @@ public class GenerateForms extends JDialog {
 	}
 
 	// ==================== QUOTATION LOGIC ====================
+	// UPDATED METHOD
 	private void loadServices() {
-		String[] services = { "Consultation", "Dental Checkup", "X-Ray", "Scaling", "Root Canal Treatment",
-				"Tooth Extraction", "Filling", "Crown", "Bridge", "Denture", "Teeth Whitening" };
-		for (String s : services)
-			serviceCombo.addItem(s);
+	    serviceCombo.removeAllItems();
+
+	    String sql = "SELECT service_name FROM services ORDER BY service_name";
+
+	    try (Connection con = DBConnection.connect();
+	         PreparedStatement ps = con.prepareStatement(sql);
+	         ResultSet rs = ps.executeQuery()) {
+
+	        while (rs.next()) {
+	            serviceCombo.addItem(rs.getString("service_name"));
+	        }
+
+	    } catch (Exception e) {
+	        e.printStackTrace();
+	    }
+	}
+	// NEW METHOD
+	private void saveServiceIfNotExists(String service) {
+
+	    String sql = "INSERT INTO services(service_name) " +
+	                 "SELECT ? WHERE NOT EXISTS " +
+	                 "(SELECT 1 FROM services WHERE LOWER(service_name)=LOWER(?))";
+
+	    try (Connection con = DBConnection.connect();
+	         PreparedStatement ps = con.prepareStatement(sql)) {
+
+	        ps.setString(1, service);
+	        ps.setString(2, service);
+	        ps.executeUpdate();
+
+	    } catch (Exception e) {
+	        e.printStackTrace();
+	    }
+	}
+	// NEW METHOD
+	private void deleteService(String service) {
+
+	    String sql = "DELETE FROM services WHERE LOWER(service_name)=LOWER(?)";
+
+	    try (Connection con = DBConnection.connect();
+	         PreparedStatement ps = con.prepareStatement(sql)) {
+
+	        ps.setString(1, service);
+	        ps.executeUpdate();
+
+	    } catch (Exception e) {
+	        e.printStackTrace();
+	    }
 	}
 
+	// UPDATED METHOD
 	private void addQuotationItem() {
-		String service = serviceCombo.getEditor().getItem().toString().trim();
-		if (service.isEmpty()) {
-			showToast("Enter service name");
-			return;
-		}
-		int qty = (Integer) quantitySpinner.getValue();
-		double price;
-		try {
-			price = Double.parseDouble(priceField.getText().trim());
-			if (price <= 0)
-				throw new NumberFormatException();
-		} catch (Exception e) {
-			showToast("Enter valid price");
-			return;
-		}
-		QuotationItem item = new QuotationItem(service, qty, price);
-		quotationItems.add(item);
-		quotationModel.addRow(new Object[] { service, qty, price, item.getTotal() });
-		serviceCombo.setSelectedIndex(0);
-		quantitySpinner.setValue(1);
-		priceField.setText("");
-		calculateTotals();
-		showToast("Item added");
-	}
+	    String service = serviceCombo.getEditor().getItem().toString().trim();
 
+	    if (service.isEmpty()) {
+	        showToast("Enter service name");
+	        return;
+	    }
+
+	    // ✅ SAVE SERVICE
+	    saveServiceIfNotExists(service);
+
+	    int qty = (Integer) quantitySpinner.getValue();
+
+	    double price;
+	    try {
+	        price = Double.parseDouble(priceField.getText().trim());
+	        if (price <= 0) throw new NumberFormatException();
+	    } catch (Exception e) {
+	        showToast("Enter valid price");
+	        return;
+	    }
+
+	    QuotationItem item = new QuotationItem(service, qty, price);
+	    quotationItems.add(item);
+
+	    quotationModel.addRow(new Object[]{
+	            service, qty, price, item.getTotal()
+	    });
+
+	    loadServices(); // refresh dropdown
+
+	    serviceCombo.setSelectedItem("");
+	    quantitySpinner.setValue(1);
+	    priceField.setText("");
+
+	    calculateTotals();
+	    showToast("Item added");
+	}
 	private void updateQuotationItem(int row) {
 		if (row >= quotationItems.size())
 			return;
@@ -479,14 +595,18 @@ public class GenerateForms extends JDialog {
 	}
 
 	private void calculateTotals() {
-		subtotal = 0;
-		for (QuotationItem item : quotationItems)
-			subtotal += item.getTotal();
-		tax = subtotal * 0.18;
-		total = subtotal + tax;
-		subtotalLabel.setText(String.format("₹ %.2f", subtotal));
-		taxLabel.setText(String.format("₹ %.2f", tax));
-		totalLabel.setText(String.format("₹ %.2f", total));
+	    subtotal = 0;
+
+	    for (QuotationItem item : quotationItems) {
+	        subtotal += item.getTotal();
+	    }
+
+	    // ❌ Remove GST
+	    tax = 0;
+	    total = subtotal;
+
+	    subtotalLabel.setText(String.format("₹ %.2f", subtotal));
+	    totalLabel.setText(String.format("₹ %.2f", total));
 	}
 
 	private void generateQuotation() {
@@ -564,7 +684,6 @@ public class GenerateForms extends JDialog {
 
 	    // Totals (Right aligned better)
 	    sb.append(String.format("%40s %12.2f%n", "Subtotal:", subtotal));
-	    sb.append(String.format("%40s %12.2f%n", "Tax (18% GST):", tax));
 	    sb.append("---------------------------------------------------------------\n");
 	    sb.append(String.format("%40s %12.2f%n", "GRAND TOTAL:", total));
 

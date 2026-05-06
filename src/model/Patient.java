@@ -7,26 +7,29 @@ public class Patient {
 	private int age;
 	private String gender;
 	private String phone;
+	private String phone2;
 	private String address;
 	private String disease;
 	private String date;
 	
 
-	public Patient(int id, String name, int age, String gender, String phone, String address, String disease,
-			String date) {
-		this.id = id;
-		this.name = name;
-		this.age = age;
-		this.gender = gender;
-		this.phone = phone;
-		this.address = address;
-		this.disease = disease;
-		this.date = date;
-	
+	public Patient(int id, String name, int age, String gender, String phone, String phone2, String address, String disease, String date) {
+	    this.id = id;
+	    this.name = name;
+	    this.age = age;
+	    this.gender = gender;
+	    this.phone = phone;
+	    this.phone2 = phone2;   // ✅ NEW
+	    this.address = address;
+	    this.disease = disease;
+	    this.date = date;
 	}
+	
+	
+	
 
-	public Patient(String name, int age, String gender, String phone, String address, String disease, String date) {
-		this(0, name, age, gender, phone, address, disease, date);
+	public Patient(String name, int age, String gender, String phone, String phone2, String address, String disease, String date) {
+	    this(0, name, age, gender, phone, phone2, address, disease, date);
 	}
 
 	public int getId() {
@@ -48,6 +51,12 @@ public class Patient {
 	public String getPhone() {
 		return phone;
 	}
+	
+	public String getPhone2() {
+	    return phone2;
+	}
+
+	
 
 	public String getAddress() {
 		return address;
@@ -79,6 +88,9 @@ public class Patient {
 
 	public void setPhone(String phone) {
 		this.phone = phone;
+	}
+	public void setPhone2(String phone2) {
+	    this.phone2 = phone2;
 	}
 
 	public void setAddress(String address) {
