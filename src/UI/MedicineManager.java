@@ -1614,15 +1614,17 @@ public class MedicineManager extends JFrame {
     }
 
     private void saveInlineEdit(int row) {
-        int modelRow     = medicineTable.convertRowIndexToModel(row);
-        int id           = (int)    medicineModel.getValueAt(modelRow, 0);
-        String drugForm  = (String) medicineModel.getValueAt(modelRow, 1);
-        String tradeName = (String) medicineModel.getValueAt(modelRow, 2);
-        String content   = (String) medicineModel.getValueAt(modelRow, 3);
-        String weight    = (String) medicineModel.getValueAt(modelRow, 4);
-        String unit      = (String) medicineModel.getValueAt(modelRow, 5);
-        String company   = (String) medicineModel.getValueAt(modelRow, 6);
-        String generic   = (String) medicineModel.getValueAt(modelRow, 7);
+        if (row < 0 || row >= medicineModel.getRowCount()) {
+            return;
+        }
+        int id           = (int)    medicineModel.getValueAt(row, 0);
+        String drugForm  = (String) medicineModel.getValueAt(row, 1);
+        String tradeName = (String) medicineModel.getValueAt(row, 2);
+        String content   = (String) medicineModel.getValueAt(row, 3);
+        String weight    = (String) medicineModel.getValueAt(row, 4);
+        String unit      = (String) medicineModel.getValueAt(row, 5);
+        String company   = (String) medicineModel.getValueAt(row, 6);
+        String generic   = (String) medicineModel.getValueAt(row, 7);
 
         String sql = "UPDATE medicines SET drug_form=?, trade_name=?, content=?, " +
                      "weight=?, unit=?, company=?, generic_name=? WHERE id=?";
@@ -1636,9 +1638,13 @@ public class MedicineManager extends JFrame {
             ps.setString(6, company);
             ps.setString(7, generic);
             ps.setInt(8, id);
-            ps.executeUpdate();
+            int updated = ps.executeUpdate();
+            if (updated == 0) {
+                showToast("No record updated for medicine ID: " + id);
+            }
         } catch (SQLException e) {
             e.printStackTrace();
+            showToast("Error updating medicine");
         }
     }
 
@@ -1746,28 +1752,39 @@ public class MedicineManager extends JFrame {
         int modelRow = medicineTable.convertRowIndexToModel(row);
         int id       = (int) medicineModel.getValueAt(modelRow, 0);
 
+        // Read all fields into locals, then let the connection close via try-with-resources
+        String drugForm = null, tradeName = null, content = null,
+               weight = null, unit = null, company = null,
+               genericName = null, instruction = null;
+
         try (Connection conn = DBConnection.connect();
              PreparedStatement ps = conn.prepareStatement(
                  "SELECT * FROM medicines WHERE id=?")) {
             ps.setInt(1, id);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
-                    showEditMedicineDialog(id,
-                        rs.getString("drug_form"),
-                        rs.getString("trade_name"),
-                        rs.getString("content"),
-                        rs.getString("weight"),
-                        rs.getString("unit"),
-                        rs.getString("company"),
-                        rs.getString("generic_name"),
-                        rs.getString("instruction"));
+                    drugForm    = rs.getString("drug_form");
+                    tradeName   = rs.getString("trade_name");
+                    content     = rs.getString("content");
+                    weight      = rs.getString("weight");
+                    unit        = rs.getString("unit");
+                    company     = rs.getString("company");
+                    genericName = rs.getString("generic_name");
+                    instruction = rs.getString("instruction");
                 }
             }
         } catch (SQLException e) {
             e.printStackTrace();
+            showToast("Error loading medicine");
+            return;
+        }
+
+        // Connection is now fully closed — safe to open a new one inside the dialog
+        if (tradeName != null) {
+            showEditMedicineDialog(id, drugForm, tradeName, content,
+                                   weight, unit, company, genericName, instruction);
         }
     }
-
     private void showEditMedicineDialog(int id, String drugForm, String tradeName,
             String content, String weight, String unit, String company,
             String genericName, String savedInstruction) {
@@ -1808,30 +1825,58 @@ public class MedicineManager extends JFrame {
 
         JButton update = createActionButton("Update Medicine", SUCCESS);
         update.addActionListener(e -> {
+
             if (tradeNameField.getText().trim().isEmpty()) {
                 showToast("Trade Name is required!");
                 return;
             }
-            String sql = "UPDATE medicines SET drug_form=?, trade_name=?, content=?, " +
-                         "weight=?, unit=?, company=?, generic_name=?, instruction=? WHERE id=?";
+
+            String sql = "UPDATE medicines SET " +
+                         "drug_form=?, trade_name=?, content=?, " +
+                         "weight=?, unit=?, company=?, generic_name=?, instruction=? " +
+                         "WHERE id=?";
+
             try (Connection conn = DBConnection.connect();
                  PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setString(1, drugFormField.getText());
-                ps.setString(2, tradeNameField.getText());
-                ps.setString(3, contentField.getText());
-                ps.setString(4, weightField.getText());
+
+                // 🔥 Prevent SQLite lock issues
+                conn.setAutoCommit(true);
+
+                ps.setString(1, drugFormField.getText().trim());
+                ps.setString(2, tradeNameField.getText().trim());
+                ps.setString(3, contentField.getText().trim());
+                ps.setString(4, weightField.getText().trim());
                 ps.setString(5, (String) unitCombo.getSelectedItem());
-                ps.setString(6, companyField.getText());
-                ps.setString(7, genericField.getText());
+                ps.setString(6, companyField.getText().trim());
+                ps.setString(7, genericField.getText().trim());
                 ps.setString(8, (String) instCombo.getSelectedItem());
                 ps.setInt(9, id);
-                ps.executeUpdate();
-                loadMedicines();
-                dialog.dispose();
-                showToast("Medicine updated successfully!");
+
+                int updated = ps.executeUpdate();
+
+                if (updated > 0) {
+
+                    dialog.dispose();
+
+                    // 🔥 Refresh safely after DB update
+                    SwingUtilities.invokeLater(() -> {
+                        loadMedicines();
+                    });
+
+                    showToast("Medicine updated successfully!");
+
+                } else {
+
+                    showToast("Update failed!");
+
+                }
+
             } catch (SQLException ex) {
+
                 ex.printStackTrace();
-                showToast("Error: " + ex.getMessage());
+
+                showToast("Database is busy. Please try again.");
+
             }
         });
 
@@ -1918,7 +1963,7 @@ public class MedicineManager extends JFrame {
         JPanel footer = new JPanel(new FlowLayout(FlowLayout.CENTER));
         footer.setBackground(PRIMARY_LIGHT);
         JLabel footerLabel = new JLabel(
-            "Smile Care Hospital Management System • Medicine Module v4.1");
+        	    "Smile Care Dental Clinic & Implant Center • Version 1.0");
         footerLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         footer.add(footerLabel);
         return footer;

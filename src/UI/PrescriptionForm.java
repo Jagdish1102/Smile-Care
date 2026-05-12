@@ -5,6 +5,7 @@ import dao.PatientDAO;
 import dao.PrescriptionDAO;
 import dhule_Hospital_database.DBConnection;
 import model.Patient;
+import util.PatientIdUtil;
 
 import javax.swing.*;
 import javax.swing.border.*;
@@ -36,9 +37,6 @@ public class PrescriptionForm extends JFrame {
 	private JSpinner quantitySpinner;
 	private JPanel mainPanel;
 	private JTextField daysField;
-	private JTextField morningDoseField;
-	private JTextField afternoonDoseField;
-	private JTextField eveningDoseField;
 
 	private JTextArea prescriptionArea;
 	private JTextArea adviceArea;
@@ -790,138 +788,274 @@ public class PrescriptionForm extends JFrame {
 	}
 
 	private void printPrescription() {
+
 	    if (patientBox.getSelectedIndex() <= 0) {
 	        showWarning("Please select a patient first");
 	        return;
 	    }
 
 	    try {
+
 	        PrinterJob job = PrinterJob.getPrinterJob();
 	        job.setJobName("Prescription - " + currentPrescriptionId);
 
 	        PageFormat pf = job.defaultPage();
 	        Paper paper = pf.getPaper();
-	        paper.setImageableArea(20, 60, paper.getWidth() - 40, paper.getHeight() - 100);
+
+	        // ✅ Margins
+	        double topMargin = 6.5 * 28.35;
+	        double bottomMargin = 2.5 * 28.35;
+	        double leftMargin = 1.2 * 28.35;
+	        double rightMargin = 1.2 * 28.35;
+
+	        paper.setImageableArea(
+	                leftMargin,
+	                topMargin,
+	                paper.getWidth() - leftMargin - rightMargin,
+	                paper.getHeight() - topMargin - bottomMargin
+	        );
+
 	        pf.setPaper(paper);
 
-	        // ✅ Get selected patient
-	        PatientSelection patientSel = getSelectedPatient(patientBox.getSelectedIndex());
+	        // ✅ Patient
+	        PatientSelection patientSel =
+	                getSelectedPatient(patientBox.getSelectedIndex());
+
 	        if (patientSel == null) {
 	            showWarning("Invalid patient selection");
 	            return;
 	        }
 
-	        // ✅ Fetch full patient (for address)
-	        Patient fullPatient = PatientDAO.getPatientById(patientSel.id);
+	        Patient fullPatient =
+	                PatientDAO.getPatientById(patientSel.id);
 
 	        final String name = patientSel.name;
-	        final String age  = String.valueOf(patientSel.age);
-	        final String address = (fullPatient != null && fullPatient.getAddress() != null)
-	                ? fullPatient.getAddress()
-	                : "";
+	        final String age = String.valueOf(patientSel.age);
 
-	        final String date   = LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+	        final String address =
+	                (fullPatient != null && fullPatient.getAddress() != null)
+	                        ? fullPatient.getAddress()
+	                        : "";
+
+	        final String date =
+	                LocalDate.now().format(
+	                        DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+
 	        final String rxText = prescriptionArea.getText();
 
-	        job.setPrintable((Graphics g, PageFormat pageFormat, int pageIndex) -> {
-	            if (pageIndex > 0) return Printable.NO_SUCH_PAGE;
+	        job.setPrintable((Graphics g,
+	                           PageFormat pageFormat,
+	                           int pageIndex) -> {
+
+	            if (pageIndex > 0)
+	                return Printable.NO_SUCH_PAGE;
 
 	            Graphics2D g2d = (Graphics2D) g;
-	            g2d.translate(pageFormat.getImageableX(), pageFormat.getImageableY());
-	            g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
-	                                 RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 
-	            int pageW = (int) pageFormat.getImageableWidth();
+	            g2d.translate(
+	                    pageFormat.getImageableX(),
+	                    pageFormat.getImageableY()
+	            );
 
-	            Font boldFont  = new Font("Nirmala UI", Font.BOLD, 12);
-	            Font medFont   = new Font("Nirmala UI", Font.BOLD, 13);
-	            Font subFont   = new Font("Nirmala UI", Font.PLAIN, 12);
+	            g2d.setRenderingHint(
+	                    RenderingHints.KEY_TEXT_ANTIALIASING,
+	                    RenderingHints.VALUE_TEXT_ANTIALIAS_ON
+	            );
+
+	            int pageW =
+	                    (int) pageFormat.getImageableWidth();
+
+	            // ✅ Fonts
+	            Font labelFont =
+	                    new Font("Nirmala UI", Font.BOLD, 12);
+
+	            Font valueFont =
+	                    new Font("Nirmala UI", Font.PLAIN, 12);
+
+	            Font medFont =
+	                    new Font("Nirmala UI", Font.BOLD, 13);
+
+	            Font subFont =
+	                    new Font("Nirmala UI", Font.PLAIN, 12);
 
 	            // ───────── HEADER ─────────
-	            g2d.setFont(boldFont);
-	            g2d.drawString("Name: " + name, 40, 80);
-	            g2d.drawString("Age: " + age, 40, 100);
-	            g2d.drawString("Address: " + address, 40, 120);
 
-	            FontMetrics fm = g2d.getFontMetrics(boldFont);
-	            String refStr  = "RefNo: " + currentPrescriptionId;
-	            String dateStr = "Date: " + date;
+	            int labelX = 40;
+	            int valueX = 95;
 
-	            g2d.drawString(refStr, pageW - fm.stringWidth(refStr) - 10, 80);
-	            g2d.drawString(dateStr, pageW - fm.stringWidth(dateStr) - 10, 100);
+	            int y1 = 20;
+	            int y2 = 40;
+	            int y3 = 60;
 
-	            // ───────── RX + TOTAL DRUGS TEXT ─────────
-	            g2d.setFont(new Font("Serif", Font.BOLD, 22));
-	            g2d.drawString("℞", 40, 155);
+	            // Name
+	            g2d.setFont(labelFont);
+	            g2d.drawString("Name :", labelX, y1);
 
-	            g2d.setFont(boldFont);
+	            g2d.setFont(valueFont);
+	            g2d.drawString(name, valueX, y1);
+
+	            // Age
+	            g2d.setFont(labelFont);
+	            g2d.drawString("Age :", labelX, y2);
+
+	            g2d.setFont(valueFont);
+	            g2d.drawString(age, valueX, y2);
+
+	            // Address
+	            g2d.setFont(labelFont);
+	            g2d.drawString("Address :", labelX, y3);
+
+	            g2d.setFont(valueFont);
+	            g2d.drawString(address, valueX, y3);
+
+	            // Right Side
+	            FontMetrics fm =
+	                    g2d.getFontMetrics(labelFont);
+
+	            int rightX = pageW - 180;
+
+	            // Ref No
+	            g2d.setFont(labelFont);
+	            g2d.drawString("RefNo :", rightX, y1);
+
+	            g2d.setFont(valueFont);
+	            g2d.drawString(
+	                    currentPrescriptionId,
+	                    rightX + fm.stringWidth("RefNo :"),
+	                    y1
+	            );
+
+	            // Date
+	            g2d.setFont(labelFont);
+	            g2d.drawString("Date :", rightX, y2);
+
+	            g2d.setFont(valueFont);
+	            g2d.drawString(
+	                    date,
+	                    rightX + fm.stringWidth("Date :"),
+	                    y2
+	            );
+
+	            // ───────── RX ─────────
+
+	            g2d.setFont(
+	                    new Font("Serif", Font.BOLD, 22)
+	            );
+
+	            g2d.drawString("℞", 40, 95);
+
+	            g2d.setFont(labelFont);
+
 	            String totalLabel = "Total Drugs";
-	            g2d.drawString(totalLabel, pageW - fm.stringWidth(totalLabel) - 10, 155);
+
+	            g2d.drawString(
+	                    totalLabel,
+	                    pageW - fm.stringWidth(totalLabel) - 10,
+	                    95
+	            );
 
 	            // ───────── MEDICINE PRINT ─────────
-	            String[] lines = rxText.split("\n");
-	            int shiftRight = 20; // 👈 control value
-	            int leftX = 40;
-	            int medX  = 130 + shiftRight;
-	            int rightX = pageW - 10;
 
-	            int y = 180;
+	            String[] lines = rxText.split("\n");
+
+	            int shiftRight = 20;
+
+	            int leftX = 40;
+	            int medX = 130 + shiftRight;
+	            int rightQtyX = pageW - 10;
+
+	            int y = 120;
+
 	            int i = 0;
 
 	            while (i < lines.length) {
 
-	                if (y > 700) break;
+	                if (y > 700)
+	                    break;
 
 	                if (lines[i].trim().isEmpty()) {
 	                    i++;
 	                    continue;
 	                }
 
-	                // 🔹 Line 1 → Form + Medicine Name
-	                String line1 = lines[i++].trim();
-	                String[] parts1 = line1.split("\\s{2,}", 2);
+	                // 🔹 Line 1
+	                String line1 =
+	                        lines[i++].trim();
 
-	                String form = parts1.length > 1 ? parts1[0].trim() : "";
+	                String[] parts1 =
+	                        line1.split("\\s{2,}", 2);
 
-	                // ✅ CAPITAL medicine name
-	                String med = (parts1.length > 1 ? parts1[1].trim() : line1).toUpperCase();
+	                String form =
+	                        parts1.length > 1
+	                                ? parts1[0].trim()
+	                                : "";
 
-	                int indent = 25; // 👈 form ke liye space
+	                String med =
+	                        (parts1.length > 1
+	                                ? parts1[1].trim()
+	                                : line1).toUpperCase();
+
+	                int indent = 25;
 
 	                g2d.setFont(medFont);
 
 	                if (!form.isEmpty()) {
-	                    g2d.drawString(form, leftX + indent, y);
+	                    g2d.drawString(
+	                            form,
+	                            leftX + indent,
+	                            y
+	                    );
 	                }
 
-	                g2d.drawString(med, medX, y);
+	                g2d.drawString(
+	                        med,
+	                        medX,
+	                        y
+	                );
+
 	                y += 18;
 
+	                // 🔹 Line 2
+	                if (i < lines.length &&
+	                        !lines[i].trim().isEmpty()) {
 
-	                // 🔹 Line 2 → Content + Qty
-	                if (i < lines.length && !lines[i].trim().isEmpty()) {
+	                    String line2 =
+	                            lines[i++].trim();
 
-	                    String line2 = lines[i++].trim();
-	                    int lastSpace = line2.lastIndexOf(' ');
+	                    int lastSpace =
+	                            line2.lastIndexOf(' ');
 
-	                    // ✅ CAPITAL content
-	                    String content = (lastSpace > 0
-	                            ? line2.substring(0, lastSpace).trim()
-	                            : line2).toUpperCase();
+	                    String content =
+	                            (lastSpace > 0
+	                                    ? line2.substring(0, lastSpace).trim()
+	                                    : line2).toUpperCase();
 
-	                    String qty = lastSpace > 0
-	                            ? line2.substring(lastSpace).trim()
-	                            : "";
+	                    String qty =
+	                            lastSpace > 0
+	                                    ? line2.substring(lastSpace).trim()
+	                                    : "";
 
 	                    g2d.setFont(subFont);
 
 	                    if (!content.isEmpty()) {
-	                        g2d.drawString(content, medX, y);
+
+	                        g2d.drawString(
+	                                content,
+	                                medX,
+	                                y
+	                        );
 	                    }
 
 	                    if (!qty.isEmpty()) {
-	                        FontMetrics fm2 = g2d.getFontMetrics(subFont);
-	                        g2d.drawString(qty, rightX - fm2.stringWidth(qty), y);
+
+	                        FontMetrics fm2 =
+	                                g2d.getFontMetrics(subFont);
+
+	                        g2d.drawString(
+	                                qty,
+	                                rightQtyX - fm2.stringWidth(qty),
+	                                y
+	                        );
 	                    }
 
 	                    y += 16;
@@ -930,33 +1064,48 @@ public class PrescriptionForm extends JFrame {
 	                    i++;
 	                }
 
+	                // 🔹 Line 3
+	                if (i < lines.length &&
+	                        !lines[i].trim().isEmpty()) {
 
-	                // 🔹 Line 3 → Instruction (optional CAPITAL)
-	                if (i < lines.length && !lines[i].trim().isEmpty()) {
-
-	                    String line3 = lines[i++].trim().toUpperCase(); // 👈 optional uppercase
+	                    String line3 =
+	                            lines[i++].trim().toUpperCase();
 
 	                    g2d.setFont(subFont);
-	                    g2d.drawString(line3, medX, y);
+
+	                    g2d.drawString(
+	                            line3,
+	                            medX,
+	                            y
+	                    );
+
 	                    y += 18;
 
 	                } else if (i < lines.length) {
 	                    i++;
 	                }
 
-	                y += 6; // spacing between medicines
+	                y += 6;
 	            }
 
 	            return Printable.PAGE_EXISTS;
+
 	        }, pf);
 
 	        if (job.printDialog()) {
+
 	            job.print();
-	            showTemporaryStatus("Prescription printed");
+
+	            showTemporaryStatus(
+	                    "Prescription printed"
+	            );
 	        }
 
 	    } catch (Exception e) {
-	        showError("Printing error: " + e.getMessage());
+
+	        showError(
+	                "Printing error: " + e.getMessage()
+	        );
 	    }
 	}
 	private void viewHistory() {
@@ -972,23 +1121,29 @@ public class PrescriptionForm extends JFrame {
 	}
 
 	private void clearForm() {
+
 		prescriptionArea.setText("");
+
 		medicineBox.setSelectedIndex(0);
 		drugMasterBox.setSelectedIndex(0);
+
 		quantitySpinner.setValue(1);
+
 		daysField.setText("5");
-		morningDoseField.setText("1");
-		afternoonDoseField.setText("1");
-		eveningDoseField.setText("1");
+
 		if (instructionBox.getItemCount() > 0) {
 			instructionBox.setSelectedIndex(0);
 		}
+
 		if (patientId > 0) {
-			String rxId = "P" + patientId + "-" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+
+			String rxId = "P-" + PatientIdUtil.format(patientId);
 
 			currentPrescriptionId = rxId;
-			prescriptionIdLabel.setText(rxId); // ✅ correct
+
+			prescriptionIdLabel.setText(rxId);
 		}
+
 		showTemporaryStatus("Form cleared");
 	}
 
@@ -1004,7 +1159,7 @@ public class PrescriptionForm extends JFrame {
 				this.patientId = patient.id;
 
 				// ✅ Generate Prescription ID
-				String rxId = "P" + patient.id + "-" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+				String rxId = "P-" + PatientIdUtil.format(patient.id);
 
 				// ✅ Store + Show
 				currentPrescriptionId = rxId;
@@ -1142,8 +1297,7 @@ public class PrescriptionForm extends JFrame {
 	    this.patientId = p.getId();
 
 	    // Generate Prescription ID
-	    String rxId = "P" + p.getId() + "-" +
-	            LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+	    String rxId = "P-" + PatientIdUtil.format(p.getId());
 
 	    currentPrescriptionId = rxId;
 	    prescriptionIdLabel.setText(rxId);

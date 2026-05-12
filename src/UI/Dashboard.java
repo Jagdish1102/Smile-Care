@@ -83,7 +83,7 @@ public class Dashboard extends JFrame {
 
 		// Welcome text
 		String userName = getCurrentUserName();
-		welcomeLabel = new JLabel("Welcome back, " + userName + "!");
+		welcomeLabel = new JLabel("Welcome back, Dr. Amit A Jain!");
 		welcomeLabel.setFont(new Font("Segoe UI", Font.BOLD, 24));
 		welcomeLabel.setForeground(new Color(0, 51, 102));
 
@@ -362,7 +362,7 @@ public class Dashboard extends JFrame {
 
 	// 🔹 Get current user name (implement based on your session management)
 	private String getCurrentUserName() {
-		return util.SessionManager.getUser() != null ? util.SessionManager.getUser() : "User";
+		return util.SessionManager.getUser() != null ? util.SessionManager.getUser() : "Dr.Amit A Jain";
 	}
 
 	@Override

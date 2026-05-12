@@ -192,7 +192,7 @@ public class AddPatientForm extends JFrame {
         titlePanel.setLayout(new BoxLayout(titlePanel, BoxLayout.Y_AXIS));
         titlePanel.setOpaque(false);
 
-        JLabel hospitalName = new JLabel("Smile Care Dental Clinic");
+        JLabel hospitalName = new JLabel("Smile Care Dental Clinic & Implant Center");
         hospitalName.setFont(new Font("Segoe UI", Font.BOLD, 16));
         hospitalName.setForeground(PRIMARY_COLOR);
 
@@ -452,7 +452,7 @@ public class AddPatientForm extends JFrame {
         leftLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
         leftLabel.setForeground(new Color(120, 120, 120));
 
-        JLabel rightLabel = new JLabel("Version 3.0");
+        JLabel rightLabel = new JLabel("Version 1.0");
         rightLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
         rightLabel.setForeground(new Color(120, 120, 120));
         rightLabel.setHorizontalAlignment(SwingConstants.RIGHT);

@@ -2,6 +2,7 @@ package UI;
 
 import dao.PatientDAO;
 import model.Patient;
+import util.PatientIdUtil;
 
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -36,7 +37,7 @@ public class ExportToExcel {
 			int rowNum = 1;
 			for (Patient p : list) {
 				Row row = sheet.createRow(rowNum++);
-				row.createCell(0).setCellValue(p.getId());
+				row.createCell(0).setCellValue(PatientIdUtil.format(p.getId()));
 				row.createCell(1).setCellValue(p.getName());
 				row.createCell(2).setCellValue(p.getAge());
 				row.createCell(3).setCellValue(p.getGender());

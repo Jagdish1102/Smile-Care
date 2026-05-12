@@ -14,9 +14,9 @@ public class DBSetup {
 			st.execute("CREATE TABLE IF NOT EXISTS users (" + "id INTEGER PRIMARY KEY AUTOINCREMENT," + "username TEXT,"
 					+ "password TEXT)");
 
-			st.execute("INSERT INTO users (username, password) " + "SELECT 'admin','1234' "
-					+ "WHERE NOT EXISTS (SELECT 1 FROM users WHERE username='admin')");
-
+			st.execute("INSERT INTO users (username, password) "
+			        + "SELECT 'j','jj' "
+			        + "WHERE NOT EXISTS (SELECT 1 FROM users WHERE username='j')");
 			// ================= PATIENTS =================
 			st.execute("CREATE TABLE IF NOT EXISTS patients ("
 			        + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
@@ -31,6 +31,14 @@ public class DBSetup {
 			        + "date TEXT)");
 			
 			addColumnSafe(st, "patients", "phone2", "TEXT");
+			// Set patient ID start from 12000
+			st.executeUpdate(
+			    "INSERT OR IGNORE INTO patients (id, name) VALUES (11999, 'dummy')"
+			);
+
+			st.executeUpdate(
+			    "DELETE FROM patients WHERE id = 11999"
+			);
 
 			// ================= BILLING =================
 			st.execute("CREATE TABLE IF NOT EXISTS billing (" + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
@@ -179,6 +187,7 @@ public class DBSetup {
 
 			st.execute("CREATE INDEX IF NOT EXISTS idx_patient_name ON patients(name)");
 			st.execute("CREATE INDEX IF NOT EXISTS idx_patient_phone ON patients(phone)");
+			st.execute("CREATE INDEX IF NOT EXISTS idx_patient_phone2 ON patients(phone2)");
 			st.execute("CREATE INDEX IF NOT EXISTS idx_patient_date ON patients(date)");
 			st.execute("CREATE INDEX IF NOT EXISTS idx_medicine_trade ON medicines(trade_name)");
 			st.execute("CREATE INDEX IF NOT EXISTS idx_template_name ON prescription_templates(template_name)");

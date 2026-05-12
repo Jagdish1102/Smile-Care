@@ -9,6 +9,8 @@ import java.awt.*;
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.event.*;
+import java.awt.print.PageFormat;
+import java.awt.print.Paper;
 import java.awt.print.Printable;
 import java.awt.print.PrinterJob;
 import java.sql.*;
@@ -20,11 +22,14 @@ import java.util.List;
 import java.util.Locale;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 // Apache POI imports
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import util.PatientIdUtil;
 
 public class ViewBills extends JFrame {
 
@@ -104,8 +109,8 @@ public class ViewBills extends JFrame {
 		JPanel leftSection = new JPanel(new FlowLayout(FlowLayout.LEFT));
 		leftSection.setOpaque(false);
 
-		JLabel title = new JLabel("Smile Care Dental Clinic - Bills");
-		title.setFont(new Font("Segoe UI", Font.BOLD, 24));
+		JLabel title = new JLabel("Smile Care Dental Clinic & Implant Center");
+		title.setFont(new Font("Segoe UI", Font.BOLD, 18));
 		title.setForeground(PRIMARY_COLOR);
 		leftSection.add(title);
 
@@ -589,8 +594,13 @@ public class ViewBills extends JFrame {
 	}
 	
 	private void showExportOptions() {
-	    String[] options = {"Today's Bills", "Select Date Range"};
-	    
+
+	    String[] options = {
+	            "Today's Bills",
+	            "Select Date Range",
+	            "Selected Patients"
+	    };
+
 	    int choice = JOptionPane.showOptionDialog(
 	            this,
 	            "Choose export type",
@@ -600,15 +610,247 @@ public class ViewBills extends JFrame {
 	            null,
 	            options,
 	            options[0]);
-	    
+
 	    if (choice == 0) {
+
 	        LocalDate today = LocalDate.now();
 	        exportBillsByDate(today.toString(), today.toString());
+
 	    } else if (choice == 1) {
+
 	        showDateRangeDialog();
+
+	    } else if (choice == 2) {
+
+	        exportSelectedBills();
 	    }
 	}
-	
+	private void exportSelectedBills() {
+
+	    try {
+
+	        int[] selectedRows = getSelectedRows();
+
+	        if (selectedRows.length == 0) {
+	            showStatusMessage("Please select bills first", WARNING_COLOR);
+	            return;
+	        }
+
+	        JFileChooser chooser = new JFileChooser();
+	        chooser.setDialogTitle("Save Selected Bills");
+
+	        String fileName = "Selected_Bills_Report.xlsx";
+	        chooser.setSelectedFile(new File(fileName));
+
+	        int option = chooser.showSaveDialog(this);
+
+	        if (option != JFileChooser.APPROVE_OPTION) {
+	            return;
+	        }
+
+	        File file = chooser.getSelectedFile();
+
+	        if (!file.getName().endsWith(".xlsx")) {
+	            file = new File(file.getAbsolutePath() + ".xlsx");
+	        }
+
+	        double grandTotal = 0;
+
+	        try (Workbook workbook = new XSSFWorkbook();
+	             FileOutputStream fos = new FileOutputStream(file)) {
+
+	            Sheet sheet = workbook.createSheet("Selected Bills");
+
+	            // ===== TITLE STYLE =====
+	            CellStyle titleStyle = workbook.createCellStyle();
+
+	            org.apache.poi.ss.usermodel.Font titleFont = workbook.createFont();
+	            titleFont.setBold(true);
+	            titleFont.setFontHeightInPoints((short) 18);
+
+	            titleStyle.setFont(titleFont);
+	            titleStyle.setAlignment(HorizontalAlignment.CENTER);
+
+	            // ===== HEADER STYLE =====
+	            CellStyle headerStyle = workbook.createCellStyle();
+
+	            org.apache.poi.ss.usermodel.Font headerFont = workbook.createFont();
+	            headerFont.setBold(true);
+	            headerFont.setColor(IndexedColors.WHITE.getIndex());
+
+	            headerStyle.setFont(headerFont);
+	            headerStyle.setFillForegroundColor(IndexedColors.BLUE.getIndex());
+	            headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+	            headerStyle.setAlignment(HorizontalAlignment.CENTER);
+
+	            headerStyle.setBorderTop(BorderStyle.THIN);
+	            headerStyle.setBorderBottom(BorderStyle.THIN);
+	            headerStyle.setBorderLeft(BorderStyle.THIN);
+	            headerStyle.setBorderRight(BorderStyle.THIN);
+
+	            // ===== DATA STYLE =====
+	            CellStyle dataStyle = workbook.createCellStyle();
+
+	            dataStyle.setBorderTop(BorderStyle.THIN);
+	            dataStyle.setBorderBottom(BorderStyle.THIN);
+	            dataStyle.setBorderLeft(BorderStyle.THIN);
+	            dataStyle.setBorderRight(BorderStyle.THIN);
+
+	            // ===== AMOUNT STYLE =====
+	            CellStyle amountStyle = workbook.createCellStyle();
+
+	            amountStyle.cloneStyleFrom(dataStyle);
+
+	            amountStyle.setDataFormat(
+	                    workbook.createDataFormat().getFormat("₹#,##0.00"));
+
+	            amountStyle.setAlignment(HorizontalAlignment.RIGHT);
+
+	            int rowIndex = 0;
+
+	            // ===== CLINIC NAME =====
+	            Row clinicRow = sheet.createRow(rowIndex++);
+	            Cell clinicCell = clinicRow.createCell(0);
+
+	            clinicCell.setCellValue("Smile Care Dental Clinic");
+	            clinicCell.setCellStyle(titleStyle);
+
+	            sheet.addMergedRegion(
+	                    new org.apache.poi.ss.util.CellRangeAddress(
+	                            0, 0, 0, 5));
+
+	            // ===== REPORT TITLE =====
+	            Row titleRow = sheet.createRow(rowIndex++);
+	            Cell titleCell = titleRow.createCell(0);
+
+	            titleCell.setCellValue("Selected Bills Report");
+	            titleCell.setCellStyle(titleStyle);
+
+	            sheet.addMergedRegion(
+	                    new org.apache.poi.ss.util.CellRangeAddress(
+	                            1, 1, 0, 5));
+
+	            // ===== DATE =====
+	            Row dateRow = sheet.createRow(rowIndex++);
+
+	            dateRow.createCell(0).setCellValue(
+	                    "Export Date : " + LocalDate.now());
+
+	            rowIndex++;
+
+	            // ===== HEADER =====
+	            Row headerRow = sheet.createRow(rowIndex++);
+
+	            String[] columns = {
+	                    "Bill ID",
+	                    "Patient Name",
+	                    "Amount",
+	                    "Date",
+	                    "Time",
+	                    "Status"
+	            };
+
+	            for (int i = 0; i < columns.length; i++) {
+
+	                Cell cell = headerRow.createCell(i);
+
+	                cell.setCellValue(columns[i]);
+	                cell.setCellStyle(headerStyle);
+	            }
+
+	            // ===== DATA =====
+	            for (int row : selectedRows) {
+
+	                Row excelRow = sheet.createRow(rowIndex++);
+
+	                int billId = Integer.parseInt(
+	                        model.getValueAt(row, 1).toString());
+
+	                String patientName =
+	                        model.getValueAt(row, 2).toString();
+
+	                double amount = Double.parseDouble(
+	                        model.getValueAt(row, 3).toString());
+
+	                String date =
+	                        model.getValueAt(row, 4).toString();
+
+	                String time =
+	                        model.getValueAt(row, 5).toString();
+
+	                String status =
+	                        model.getValueAt(row, 6).toString();
+
+	                grandTotal += amount;
+
+	                Cell c0 = excelRow.createCell(0);
+	                c0.setCellValue(billId);
+	                c0.setCellStyle(dataStyle);
+
+	                Cell c1 = excelRow.createCell(1);
+	                c1.setCellValue(patientName);
+	                c1.setCellStyle(dataStyle);
+
+	                Cell c2 = excelRow.createCell(2);
+	                c2.setCellValue(amount);
+	                c2.setCellStyle(amountStyle);
+
+	                Cell c3 = excelRow.createCell(3);
+	                c3.setCellValue(date);
+	                c3.setCellStyle(dataStyle);
+
+	                Cell c4 = excelRow.createCell(4);
+	                c4.setCellValue(time);
+	                c4.setCellStyle(dataStyle);
+
+	                Cell c5 = excelRow.createCell(5);
+	                c5.setCellValue(status);
+	                c5.setCellStyle(dataStyle);
+	            }
+
+	            // ===== GRAND TOTAL =====
+	            Row totalRow = sheet.createRow(rowIndex);
+
+	            Cell totalTextCell = totalRow.createCell(1);
+	            totalTextCell.setCellValue("GRAND TOTAL");
+	            totalTextCell.setCellStyle(headerStyle);
+
+	            Cell totalAmountCell = totalRow.createCell(2);
+	            totalAmountCell.setCellValue(grandTotal);
+	            totalAmountCell.setCellStyle(amountStyle);
+
+	            // ===== COLUMN WIDTH =====
+	            sheet.setColumnWidth(0, 4000);
+	            sheet.setColumnWidth(1, 9000);
+	            sheet.setColumnWidth(2, 5000);
+	            sheet.setColumnWidth(3, 4500);
+	            sheet.setColumnWidth(4, 4500);
+	            sheet.setColumnWidth(5, 4500);
+
+	            workbook.write(fos);
+	        }
+
+	        JOptionPane.showMessageDialog(
+	                this,
+	                "Selected bills exported successfully!",
+	                "Export Complete",
+	                JOptionPane.INFORMATION_MESSAGE);
+
+	        showStatusMessage("Selected bills exported", SUCCESS_COLOR);
+
+	    } catch (Exception e) {
+
+	        e.printStackTrace();
+
+	        JOptionPane.showMessageDialog(
+	                this,
+	                "Export Failed: " + e.getMessage(),
+	                "Error",
+	                JOptionPane.ERROR_MESSAGE);
+
+	        showStatusMessage("Export failed", DANGER_COLOR);
+	    }
+	}
 	private void showDateRangeDialog() {
 	    JTextField fromDateField = new JTextField(10);
 	    JTextField toDateField = new JTextField(10);
@@ -656,7 +898,8 @@ public class ViewBills extends JFrame {
 	
 	private void exportBillsByDate(String fromDate, String toDate) {
 	    try {
-	        String sql = "SELECT id, patient_name, amount, date FROM billing WHERE DATE(date) BETWEEN ? AND ? ORDER BY date DESC";
+	        String sql = "SELECT id, patient_name, amount, discount, total, payment_mode, bill_no, date " +
+	                "FROM billing WHERE DATE(date) BETWEEN ? AND ? ORDER BY date DESC";
 	        List<Object[]> rows = new ArrayList<>();
 	        double totalAmount = 0;
 	        try (Connection con = DBConnection.connect();
@@ -668,7 +911,12 @@ public class ViewBills extends JFrame {
 	                    int id = rs.getInt("id");
 	                    String name = rs.getString("patient_name");
 	                    double amount = rs.getDouble("amount");
-	                    totalAmount += amount;
+	                    double discount = rs.getDouble("discount");
+	                    double total = rs.getDouble("total");
+	                    String paymentMode = rs.getString("payment_mode");
+	                    String billNo = rs.getString("bill_no");
+	                    int patientId = extractPatientIdFromBillNo(billNo);
+	                    totalAmount += total;
 
 	                    String dateTime = rs.getString("date");
 	                    String datePart = "";
@@ -679,7 +927,7 @@ public class ViewBills extends JFrame {
 	                    } else {
 	                        datePart = dateTime;
 	                    }
-	                    rows.add(new Object[] {id, name, amount, datePart, timePart});
+	                    rows.add(new Object[] {id, patientId, name, amount, discount, total, paymentMode, datePart, timePart});
 	                }
 	            }
 	        }
@@ -704,7 +952,7 @@ public class ViewBills extends JFrame {
 	            file = new File(file.getAbsolutePath() + ".xlsx");
 	        }
 	        
-	        int rowIndex = 1;
+	        int rowIndex = 0;
 	        try (Workbook workbook = new XSSFWorkbook();
 	             FileOutputStream fos = new FileOutputStream(file)) {
 	            Sheet sheet = workbook.createSheet("Bills Report");
@@ -736,8 +984,14 @@ public class ViewBills extends JFrame {
 	            currencyStyle.setDataFormat(workbook.createDataFormat().getFormat("₹#,##0.00"));
 	            currencyStyle.setAlignment(HorizontalAlignment.RIGHT);
 
-	            Row headerRow = sheet.createRow(0);
-	            String[] columns = {"Bill ID", "Patient Name", "Amount (₹)", "Date", "Time"};
+	            Row logoRow = sheet.createRow(rowIndex++);
+	            logoRow.createCell(0).setCellValue(AppResources.getLogo() != null ? "Smile Care Logo" : "Smile Care Dental Clinic");
+
+	            Row titleRow = sheet.createRow(rowIndex++);
+	            titleRow.createCell(0).setCellValue("Bill Export Report");
+
+	            Row headerRow = sheet.createRow(rowIndex++);
+	            String[] columns = {"Bill ID", "Patient ID", "Patient Name", "Service/Medicine", "Amount (₹)", "Discount (₹)", "Total (₹)", "Payment", "Date", "Time"};
 	            for (int i = 0; i < columns.length; i++) {
 	                Cell cell = headerRow.createCell(i);
 	                cell.setCellValue(columns[i]);
@@ -749,25 +1003,40 @@ public class ViewBills extends JFrame {
 	                Cell idCell = row.createCell(0);
 	                idCell.setCellValue((Integer) data[0]);
 	                idCell.setCellStyle(dataStyle);
-	                Cell nameCell = row.createCell(1);
-	                nameCell.setCellValue((String) data[1]);
+	                Cell patientIdCell = row.createCell(1);
+	                patientIdCell.setCellValue((Integer) data[1] > 0 ? PatientIdUtil.format((Integer) data[1]) : "N/A");
+	                patientIdCell.setCellStyle(dataStyle);
+	                Cell nameCell = row.createCell(2);
+	                nameCell.setCellValue((String) data[2]);
 	                nameCell.setCellStyle(dataStyle);
-	                Cell amountCell = row.createCell(2);
-	                amountCell.setCellValue((Double) data[2]);
+	                Cell serviceCell = row.createCell(3);
+	                serviceCell.setCellValue("Dental Treatment / Services");
+	                serviceCell.setCellStyle(dataStyle);
+	                Cell amountCell = row.createCell(4);
+	                amountCell.setCellValue((Double) data[3]);
 	                amountCell.setCellStyle(currencyStyle);
-	                Cell dateCell = row.createCell(3);
-	                dateCell.setCellValue((String) data[3]);
+	                Cell discountCell = row.createCell(5);
+	                discountCell.setCellValue((Double) data[4]);
+	                discountCell.setCellStyle(currencyStyle);
+	                Cell totalCell = row.createCell(6);
+	                totalCell.setCellValue((Double) data[5]);
+	                totalCell.setCellStyle(currencyStyle);
+	                Cell paymentCell = row.createCell(7);
+	                paymentCell.setCellValue((String) data[6] == null ? "" : (String) data[6]);
+	                paymentCell.setCellStyle(dataStyle);
+	                Cell dateCell = row.createCell(8);
+	                dateCell.setCellValue((String) data[7]);
 	                dateCell.setCellStyle(dataStyle);
-	                Cell timeCell = row.createCell(4);
-	                timeCell.setCellValue((String) data[4]);
+	                Cell timeCell = row.createCell(9);
+	                timeCell.setCellValue((String) data[8]);
 	                timeCell.setCellStyle(dataStyle);
 	            }
 
 	            Row totalRow = sheet.createRow(rowIndex);
-	            Cell totalLabelCell = totalRow.createCell(1);
+	            Cell totalLabelCell = totalRow.createCell(5);
 	            totalLabelCell.setCellValue("GRAND TOTAL");
 	            totalLabelCell.setCellStyle(headerStyle);
-	            Cell totalAmountCell = totalRow.createCell(2);
+	            Cell totalAmountCell = totalRow.createCell(6);
 	            totalAmountCell.setCellValue(totalAmount);
 	            totalAmountCell.setCellStyle(currencyStyle);
 
@@ -795,6 +1064,21 @@ public class ViewBills extends JFrame {
 	            "Export Error",
 	            JOptionPane.ERROR_MESSAGE);
 	    }
+	}
+
+	private int extractPatientIdFromBillNo(String billNo) {
+		if (billNo == null || billNo.trim().isEmpty()) {
+			return -1;
+		}
+		Matcher matcher = Pattern.compile("^B(\\d{1,5})-").matcher(billNo.trim());
+		if (!matcher.find()) {
+			return -1;
+		}
+		try {
+			return Integer.parseInt(matcher.group(1));
+		} catch (NumberFormatException e) {
+			return -1;
+		}
 	}
 	private void viewBillDetails() {
 		int row = table.getSelectedRow();
@@ -837,6 +1121,7 @@ public class ViewBills extends JFrame {
 	}
 
 	private void printSelectedBill() {
+
 	    int[] selectedRows = getSelectedRows();
 
 	    if (selectedRows.length == 0) {
@@ -859,51 +1144,183 @@ public class ViewBills extends JFrame {
 
 	    PrinterJob job = PrinterJob.getPrinterJob();
 
+	    // ================= PAGE MARGINS =================
+
+	    PageFormat pf = job.defaultPage();
+	    Paper paper = pf.getPaper();
+
+	    double topMargin = 6.5 * 28.35;
+	    double bottomMargin = 2.5 * 28.35;
+	    double leftMargin = 1.2 * 28.35;
+	    double rightMargin = 1.2 * 28.35;
+
+	    paper.setImageableArea(
+	            leftMargin,
+	            topMargin,
+	            paper.getWidth() - leftMargin - rightMargin,
+	            paper.getHeight() - topMargin - bottomMargin
+	    );
+
+	    pf.setPaper(paper);
+
 	    job.setPrintable((graphics, pageFormat, pageIndex) -> {
-	        if (pageIndex > 0) return Printable.NO_SUCH_PAGE;
+
+	        if (pageIndex > 0)
+	            return Printable.NO_SUCH_PAGE;
 
 	        Graphics2D g2 = (Graphics2D) graphics;
-	        g2.translate(pageFormat.getImageableX(), pageFormat.getImageableY());
 
-	        int y = 20;
+	        g2.translate(
+	                pageFormat.getImageableX(),
+	                pageFormat.getImageableY()
+	        );
 
-	        g2.setFont(new Font("Monospaced", Font.BOLD, 14));
-	        g2.drawString("Smile Care Dental Clinic", 100, y);
-	        y += 20;
+	        int pageWidth = (int) pageFormat.getImageableWidth();
 
-	        g2.setFont(new Font("Monospaced", Font.PLAIN, 12));
-	        g2.drawString("-------------------------------------", 50, y);
-	        y += 20;
+	        // ================= FONTS =================
 
-	        g2.drawString("Bill ID     : " + id, 50, y); y += 20;
-	        g2.drawString("Patient     : " + name, 50, y); y += 20;
-	        g2.drawString("Amount      : ₹" + amount, 50, y); y += 20;
-	        g2.drawString("Date        : " + date, 50, y); y += 20;
-	        g2.drawString("Time        : " + time, 50, y); y += 20;
+	        Font labelFont = new Font("SansSerif", Font.BOLD, 13);
+	        Font valueFont = new Font("SansSerif", Font.PLAIN, 13);
+	        Font thanksFont = new Font("SansSerif", Font.BOLD, 12);
 
-	        y += 10;
-	        g2.drawString("-------------------------------------", 50, y);
-	        y += 20;
+	        // ================= ALIGNMENT =================
 
-	        g2.setFont(new Font("Monospaced", Font.BOLD, 12));
-	        g2.drawString("Thank You! Visit Again", 80, y);
+	        int startX = 110;   // ←→ FULL BLOCK CONTROL
+	        int valueX = 230;   // ←→ VALUE POSITION CONTROL
+
+	        int y = 30;
+
+	        // ================= TOP LINE =================
+
+	        int lineStart = startX;
+	        int lineEnd = pageWidth - startX;
+
+	        g2.drawLine(lineStart, y, lineEnd, y);
+
+	        y += 35;
+
+	        // ================= BILL DETAILS =================
+
+	        // Bill ID
+	        g2.setFont(labelFont);
+	        g2.drawString("Bill ID :", startX, y);
+
+	        g2.setFont(valueFont);
+	        g2.drawString(String.valueOf(id), valueX, y);
+
+	        y += 28;
+
+	        // Patient
+	        g2.setFont(labelFont);
+	        g2.drawString("Patient :", startX, y);
+
+	        g2.setFont(valueFont);
+	        g2.drawString(name, valueX, y);
+
+	        y += 28;
+
+	        // Amount
+	        g2.setFont(labelFont);
+	        g2.drawString("Amount :", startX, y);
+
+	        g2.setFont(valueFont);
+	        g2.drawString("₹ " + amount, valueX, y);
+
+	        y += 28;
+
+	        // Date
+	        g2.setFont(labelFont);
+	        g2.drawString("Date :", startX, y);
+
+	        g2.setFont(valueFont);
+	        g2.drawString(date, valueX, y);
+
+	        y += 28;
+
+	        // Time
+	        g2.setFont(labelFont);
+	        g2.drawString("Time :", startX, y);
+
+	        g2.setFont(valueFont);
+	        g2.drawString(time, valueX, y);
+
+	        y += 35;
+
+	        // ================= BOTTOM LINE =================
+
+	        g2.drawLine(lineStart, y, lineEnd, y);
+
+	        y += 35;
+
+	        // ================= THANK YOU =================
+
+	        g2.setFont(thanksFont);
+
+	        String thanks = "Thank You! Visit Again";
+
+	        FontMetrics tfm = g2.getFontMetrics();
+
+	        int thanksX = (pageWidth - tfm.stringWidth(thanks)) / 2;
+
+	        g2.drawString(thanks, thanksX, y);
 
 	        return Printable.PAGE_EXISTS;
-	    });
+
+	    }, pf);
 
 	    boolean doPrint = job.printDialog();
 
 	    if (doPrint) {
+
 	        try {
+
 	            job.print();
-	            showStatusMessage("Bill printed successfully", SUCCESS_COLOR);
+
+	            showStatusMessage(
+	                    "Bill printed successfully",
+	                    SUCCESS_COLOR
+	            );
+
 	        } catch (Exception e) {
+
 	            e.printStackTrace();
-	            showStatusMessage("Printing failed", DANGER_COLOR);
+
+	            showStatusMessage(
+	                    "Printing failed",
+	                    DANGER_COLOR
+	            );
 	        }
 	    }
 	}
+	// ================= PERFECT ALIGN METHOD =================
 
+	private void drawAlignedText(
+	        Graphics2D g2,
+	        String label,
+	        String value,
+	        int x,
+	        int y,
+	        Font labelFont,
+	        Font valueFont
+	) {
+
+	    // Fixed alignment positions
+	    int labelWidth = 90;
+	    int colonX = x + labelWidth;
+	    int valueX = colonX + 20;
+
+	    // Label
+	    g2.setFont(labelFont);
+	    g2.drawString(label, x, y);
+
+	    // Colon
+	    g2.setFont(labelFont);
+	    g2.drawString(":", colonX, y);
+
+	    // Value
+	    g2.setFont(valueFont);
+	    g2.drawString(value != null ? value : "", valueX, y);
+	}
 	private int[] getSelectedRows() {
 		List<Integer> selectedRows = new ArrayList<>();
 		for (int i = 0; i < model.getRowCount(); i++) {

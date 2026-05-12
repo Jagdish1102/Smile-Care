@@ -1,7 +1,5 @@
 package UI;
 
-
-
 import java.awt.BasicStroke;
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -21,6 +19,8 @@ import java.awt.RenderingHints;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.geom.RoundRectangle2D;
+import java.awt.print.PageFormat;
+import java.awt.print.Paper;
 import java.awt.print.Printable;
 import java.awt.print.PrinterException;
 import java.awt.print.PrinterJob;
@@ -52,8 +52,7 @@ import controller.BillingController;
 import model.BillCalculation;
 import model.PatientBillingInfo;
 import util.AppResources;
-
-
+import util.PatientIdUtil;
 
 /**
  * BillingForm – Smile Care Dental Clinic
@@ -65,7 +64,7 @@ import util.AppResources;
  * healthcare UI – rounded corners, teal/blue palette, readable fonts
  */
 public class BillingForm extends JFrame {
-    private final BillingController controller = new BillingController();
+	private final BillingController controller = new BillingController();
 
 	// ── Form state ────────────────────────────────────────────────────────────
 	private boolean billSaved = false;
@@ -542,9 +541,9 @@ public class BillingForm extends JFrame {
 	private void loadPatients() {
 		try {
 			patientCombo.addItem("-- Select Patient --");
-            for (String name : controller.getPatientNames()) {
-                patientCombo.addItem(name);
-            }
+			for (String name : controller.getPatientNames()) {
+				patientCombo.addItem(name);
+			}
 		} catch (Exception e) {
 			e.printStackTrace();
 			JOptionPane.showMessageDialog(this, "Error loading patients.", "Error", JOptionPane.ERROR_MESSAGE);
@@ -559,26 +558,25 @@ public class BillingForm extends JFrame {
 		}
 		String selectedName = (String) patientCombo.getSelectedItem();
 		try {
-            PatientBillingInfo info = controller.getPatientBillingInfo(selectedName);
-            if (info != null) {
-                currentPatientDbId = info.getId();
-                String displayId = String.format("PT%03d", currentPatientDbId);
-                patientIdLabel.setText(displayId);
-                patientAgeLabel.setText(info.getAge() + " yrs");
-                patientGenderLabel.setText(info.getGender());
+			PatientBillingInfo info = controller.getPatientBillingInfo(selectedName);
+			if (info != null) {
+				currentPatientDbId = info.getId();
+				patientIdLabel.setText(PatientIdUtil.format(currentPatientDbId));
+				patientAgeLabel.setText(info.getAge() + " yrs");
+				patientGenderLabel.setText(info.getGender());
 
-                // Auto-generate and show bill number immediately
-                refreshBillNumber();
+				// Auto-generate and show bill number immediately
+				refreshBillNumber();
 
-                // Reset totals
-                amountField.setText("");
-                discountSpinner.setValue(0.0);
-                subtotalLabel.setText("₹ 0.00");
-                discountLabel.setText("₹ 0.00");
-                totalLabel.setText("₹ 0.00");
-                receiptArea.setText("");
-                billSaved = false;
-            }
+				// Reset totals
+				amountField.setText("");
+				discountSpinner.setValue(0.0);
+				subtotalLabel.setText("₹ 0.00");
+				discountLabel.setText("₹ 0.00");
+				totalLabel.setText("₹ 0.00");
+				receiptArea.setText("");
+				billSaved = false;
+			}
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -588,7 +586,7 @@ public class BillingForm extends JFrame {
 		try {
 			double amount = amountField.getText().isEmpty() ? 0 : Double.parseDouble(amountField.getText());
 			double pct = (Double) discountSpinner.getValue();
-            BillCalculation calculation = controller.calculateBill(amount, pct);
+			BillCalculation calculation = controller.calculateBill(amount, pct);
 			subtotalLabel.setText(fmtRs(calculation.getSubtotal()));
 			discountLabel.setText(fmtRs(calculation.getDiscountAmount()));
 			totalLabel.setText(fmtRs(calculation.getTotal()));
@@ -715,7 +713,7 @@ public class BillingForm extends JFrame {
 	private void persistBill(String name, double amount, double disc, double total, String payment, String billNo) {
 		if (billSaved)
 			return;
-        billSaved = controller.saveBill(name, amount, disc, total, payment, billNo);
+		billSaved = controller.saveBill(name, amount, disc, total, payment, billNo);
 	}
 
 	private void resetForm() {
@@ -736,81 +734,191 @@ public class BillingForm extends JFrame {
 	}
 
 	private void printReceipt() {
+
+		if (receiptArea.getText().trim().isEmpty()) {
+			JOptionPane.showMessageDialog(this, "Generate receipt first.");
+			return;
+		}
+
 		try {
+
 			PrinterJob job = PrinterJob.getPrinterJob();
 
+			// ================= PAGE FORMAT =================
+
+			PageFormat pf = job.defaultPage();
+			Paper paper = pf.getPaper();
+
+			// ✅ Professional margins
+			double topMargin = 6.5 * 28.35;
+			double bottomMargin = 2.5 * 28.35;
+			double leftMargin = 1.2 * 28.35;
+			double rightMargin = 1.2 * 28.35;
+
+			paper.setImageableArea(
+					leftMargin,
+					topMargin,
+					paper.getWidth() - leftMargin - rightMargin,
+					paper.getHeight() - topMargin - bottomMargin
+			);
+
+			pf.setPaper(paper);
+
 			job.setPrintable((graphics, pageFormat, pageIndex) -> {
+
 				if (pageIndex > 0)
 					return Printable.NO_SUCH_PAGE;
 
 				Graphics2D g2d = (Graphics2D) graphics;
-				g2d.translate(pageFormat.getImageableX(), pageFormat.getImageableY());
 
-				Font font = new Font("Monospaced", Font.PLAIN, 11);
+				// ================= TRANSLATE =================
+
+				g2d.translate(
+						pageFormat.getImageableX(),
+						pageFormat.getImageableY()
+				);
+
+				g2d.setRenderingHint(
+						RenderingHints.KEY_TEXT_ANTIALIASING,
+						RenderingHints.VALUE_TEXT_ANTIALIAS_ON
+				);
+
+				// ================= FONT =================
+
+				Font font = new Font("Monospaced", Font.PLAIN, 12);
+				Font signFont = new Font("SansSerif", Font.BOLD, 11);
+
 				g2d.setFont(font);
+
 				FontMetrics fm = g2d.getFontMetrics();
+
+				// ================= PAGE WIDTH =================
+
+				int pageWidth = (int) pageFormat.getImageableWidth();
+
+				// ================= RECEIPT TEXT =================
 
 				String[] lines = receiptArea.getText().split("\n");
 
-				int y = 30;
+				int lineHeight = fm.getHeight() + 4;
+
+				int y = 20;
 
 				for (String line : lines) {
+
+					line = line.trim();
+
+					if (line.isEmpty()) {
+						y += lineHeight;
+						continue;
+					}
+
 					int textWidth = fm.stringWidth(line);
 
-					// CENTER ALIGN
-					int x = (int) ((pageFormat.getImageableWidth() - textWidth) / 2);
+					// ✅ PERFECT CENTER
+					int x = (pageWidth - textWidth) / 2;
+
+					if (x < 0)
+						x = 0;
 
 					g2d.drawString(line, x, y);
-					y += fm.getHeight();
+
+					y += lineHeight;
 				}
 
-				return Printable.PAGE_EXISTS;
-			});
+				// ================= SIGNATURE RIGHT SIDE =================
 
-			// Show print dialog first
+				y += 35;
+
+				g2d.setFont(signFont);
+
+				String signLine = "----------------------";
+				String signText = "Authorized Signature";
+
+				int signX = pageWidth - 220;
+
+				g2d.drawString(signLine, signX, y);
+
+				y += 18;
+
+				g2d.drawString(signText, signX + 20, y);
+
+				return Printable.PAGE_EXISTS;
+
+			}, pf);
+
 			if (!job.printDialog())
 				return;
 
-			// 🔥 Custom Abort Dialog
-			JDialog progressDialog = new JDialog(this, "Printing...", false);
-			progressDialog.setSize(250, 120);
+			// ================= PRINTING =================
+
+			JDialog progressDialog =
+					new JDialog(this, "Printing...", false);
+
+			progressDialog.setSize(260, 120);
 			progressDialog.setLocationRelativeTo(this);
 
-			JLabel label = new JLabel("Printing in progress...", SwingConstants.CENTER);
+			JLabel label =
+					new JLabel("Printing in progress...",
+							SwingConstants.CENTER);
+
 			JButton cancelBtn = new JButton("Abort");
 
 			cancelBtn.addActionListener(e -> {
-				job.cancel(); // 🔴 Abort printing
+
+				job.cancel();
 				progressDialog.dispose();
-				JOptionPane.showMessageDialog(this, "Printing Aborted ❌");
+
+				JOptionPane.showMessageDialog(
+						this,
+						"Printing Aborted ❌"
+				);
 			});
 
 			progressDialog.setLayout(new BorderLayout());
+
 			progressDialog.add(label, BorderLayout.CENTER);
 			progressDialog.add(cancelBtn, BorderLayout.SOUTH);
 
-			// Run printing in background thread
 			new Thread(() -> {
+
 				try {
-					SwingUtilities.invokeLater(() -> progressDialog.setVisible(true));
+
+					SwingUtilities.invokeLater(
+							() -> progressDialog.setVisible(true)
+					);
+
 					job.print();
+
 					SwingUtilities.invokeLater(() -> {
+
 						progressDialog.dispose();
-						JOptionPane.showMessageDialog(this, "Print Completed ✅");
+
+						JOptionPane.showMessageDialog(
+								this,
+								"Print Completed ✅"
+						);
 					});
+
 				} catch (PrinterException ex) {
+
 					SwingUtilities.invokeLater(() -> {
+
 						progressDialog.dispose();
-						JOptionPane.showMessageDialog(this, "Print Error: " + ex.getMessage());
+
+						JOptionPane.showMessageDialog(
+								this,
+								"Print Error: " + ex.getMessage()
+						);
 					});
 				}
+
 			}).start();
 
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 	}
-
 	// ══════════════════════════════════════════════════════════════════════════
 	// WIRE LISTENERS
 	// ══════════════════════════════════════════════════════════════════════════

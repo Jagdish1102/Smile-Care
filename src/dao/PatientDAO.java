@@ -2,6 +2,7 @@ package dao;
 
 import util.DBConnection;
 import model.Patient;
+import util.PatientIdRolloverService;
 
 import java.sql.*;
 import java.util.ArrayList;
@@ -40,6 +41,7 @@ public class PatientDAO {
 
         try (Connection conn = DBConnection.connect();
              PreparedStatement ps = conn.prepareStatement(sql)) {
+            PatientIdRolloverService.ensureRolloverIfNeeded(conn);
 
             ps.setString(1, p.getName());
             ps.setInt(2, p.getAge());
@@ -81,18 +83,61 @@ public class PatientDAO {
     // ================= DELETE =================
     public static boolean deletePatient(int id) {
 
-        String sql = "DELETE FROM patients WHERE id=?";
+        Connection conn = null;
+        PreparedStatement psLogin = null;
+        PreparedStatement psPatient = null;
 
-        try (Connection conn = DBConnection.connect();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try {
 
-            ps.setInt(1, id);
-            ps.executeUpdate();
-            return true;
+            conn = DBConnection.connect();
+            conn.setAutoCommit(false);
 
-        } catch (SQLException e) {
-            System.err.println("Error deleting patient: " + e.getMessage());
+            // STEP 1 - delete login/password table
+            String loginSql = "DELETE FROM patient_login WHERE patient_id=?";
+            psLogin = conn.prepareStatement(loginSql);
+            psLogin.setInt(1, id);
+            psLogin.executeUpdate();
+
+            // STEP 2 - delete patient
+            String patientSql = "DELETE FROM patients WHERE id=?";
+            psPatient = conn.prepareStatement(patientSql);
+            psPatient.setInt(1, id);
+
+            int rows = psPatient.executeUpdate();
+
+            conn.commit();
+
+            return rows > 0;
+
+        } catch (Exception e) {
+
+            try {
+                if (conn != null)
+                    conn.rollback();
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+
+            e.printStackTrace();
             return false;
+
+        } finally {
+
+            try {
+                if (psLogin != null)
+                    psLogin.close();
+
+                if (psPatient != null)
+                    psPatient.close();
+
+                if (conn != null) {
+                    conn.setAutoCommit(true);
+                    conn.close();
+                }
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -148,16 +193,26 @@ public class PatientDAO {
 
         List<Patient> list = new ArrayList<>();
 
-        String sql = "SELECT * FROM patients WHERE name LIKE ? OR phone LIKE ? OR phone2 LIKE ? ORDER BY date DESC";
+        String sql = "SELECT * FROM patients " +
+                "WHERE name LIKE ? " +
+                "OR phone LIKE ? " +
+                "OR phone2 LIKE ? " +
+                "OR CAST(id AS TEXT) LIKE ? " +
+                "OR printf('%05d', id) LIKE ? " +
+                "ORDER BY date DESC";
 
         try (Connection con = DBConnection.connect();
              PreparedStatement ps = con.prepareStatement(sql)) {
 
             String pattern = "%" + keyword + "%";
+            String idDigits = keyword.replaceAll("\\D", "");
+            String idPattern = idDigits.isEmpty() ? "%-NO-ID-MATCH-%" : "%" + idDigits + "%";
 
             ps.setString(1, pattern);
             ps.setString(2, pattern);
-            ps.setString(3, pattern); // ✅ NEW
+            ps.setString(3, pattern);
+            ps.setString(4, idPattern);
+            ps.setString(5, idPattern);
 
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {

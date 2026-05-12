@@ -75,6 +75,7 @@ import dao.PatientDAO;
 import dhule_Hospital_database.DBConnection;
 import model.Patient;
 import util.AppResources;
+import util.PatientIdUtil;
 
 
 
@@ -228,7 +229,7 @@ public class ViewPatients extends JFrame {
 			public Class<?> getColumnClass(int col) {
 				if (col == 0)
 					return Boolean.class;
-				if (col == 1 || col == 3)
+				if (col == 3)
 					return Integer.class;
 				return String.class;
 			}
@@ -511,7 +512,7 @@ public class ViewPatients extends JFrame {
 			List<Patient> list = PatientDAO.getAllPatients();
 			Collections.reverse(list); // newest first
 			for (Patient p : list)
-				model.addRow(new Object[] { false, p.getId(), p.getName(), p.getAge(), p.getGender(), p.getPhone(), // Phone
+				model.addRow(new Object[] { false, PatientIdUtil.format(p.getId()), p.getName(), p.getAge(), p.getGender(), p.getPhone(), // Phone
 																													// 1
 						p.getPhone2(), // NEW Phone 2
 						p.getDisease(), p.getDate() });
@@ -531,8 +532,8 @@ public class ViewPatients extends JFrame {
 			}
 			List<Patient> list = PatientDAO.searchPatients(kw);
 			for (Patient p : list)
-				model.addRow(new Object[] { false, p.getId(), p.getName(), p.getAge(), p.getGender(), p.getPhone(),
-						p.getDisease(), p.getDate() });
+				model.addRow(new Object[] { false, PatientIdUtil.format(p.getId()), p.getName(), p.getAge(), p.getGender(), p.getPhone(),
+						p.getPhone2(), p.getDisease(), p.getDate() });
 			showStatusMessage("Found " + model.getRowCount() + " results", SUCCESS_COLOR);
 		} catch (Exception e) {
 			showStatusMessage("Search failed", DANGER_COLOR);
@@ -556,8 +557,8 @@ public class ViewPatients extends JFrame {
 			model.setRowCount(0);
 			List<Patient> list = PatientDAO.getTodayPatients();
 			for (Patient p : list)
-				model.addRow(new Object[] { false, p.getId(), p.getName(), p.getAge(), p.getGender(), p.getPhone(),
-						p.getDisease(), p.getDate() });
+				model.addRow(new Object[] { false, PatientIdUtil.format(p.getId()), p.getName(), p.getAge(), p.getGender(), p.getPhone(),
+						p.getPhone2(), p.getDisease(), p.getDate() });
 			showStatusMessage("Showing " + model.getRowCount() + " today's patients", INFO_COLOR);
 		} catch (Exception e) {
 			showStatusMessage("Failed to load today's patients", DANGER_COLOR);
@@ -570,8 +571,8 @@ public class ViewPatients extends JFrame {
 			LocalDate today = LocalDate.now();
 			LocalDate start = today.minusDays(today.getDayOfWeek().getValue() - 1);
 			for (Patient p : PatientDAO.getPatientsByDateRange(start.toString(), today.toString()))
-				model.addRow(new Object[] { false, p.getId(), p.getName(), p.getAge(), p.getGender(), p.getPhone(),
-						p.getDisease(), p.getDate() });
+				model.addRow(new Object[] { false, PatientIdUtil.format(p.getId()), p.getName(), p.getAge(), p.getGender(), p.getPhone(),
+						p.getPhone2(), p.getDisease(), p.getDate() });
 			showStatusMessage("Showing " + model.getRowCount() + " patients this week", INFO_COLOR);
 		} catch (Exception e) {
 			showStatusMessage("Failed to load this week's patients", DANGER_COLOR);
@@ -584,8 +585,8 @@ public class ViewPatients extends JFrame {
 			LocalDate today = LocalDate.now();
 			LocalDate start = today.withDayOfMonth(1);
 			for (Patient p : PatientDAO.getPatientsByDateRange(start.toString(), today.toString()))
-				model.addRow(new Object[] { false, p.getId(), p.getName(), p.getAge(), p.getGender(), p.getPhone(),
-						p.getDisease(), p.getDate() });
+				model.addRow(new Object[] { false, PatientIdUtil.format(p.getId()), p.getName(), p.getAge(), p.getGender(), p.getPhone(),
+						p.getPhone2(), p.getDisease(), p.getDate() });
 			showStatusMessage("Showing " + model.getRowCount() + " patients this month", INFO_COLOR);
 		} catch (Exception e) {
 			showStatusMessage("Failed to load this month's patients", DANGER_COLOR);
@@ -632,7 +633,7 @@ public class ViewPatients extends JFrame {
 		if (passOpt != JOptionPane.OK_OPTION)
 			return;
 
-		if (!new String(pwField.getPassword()).equals("1234")) {
+		if (!new String(pwField.getPassword()).equals("jj")) {
 			JOptionPane.showMessageDialog(this, "❌  Wrong password. Deletion cancelled.", "Access Denied",
 					JOptionPane.ERROR_MESSAGE);
 			showStatusMessage("Wrong password — deletion cancelled", DANGER_COLOR);
@@ -1063,8 +1064,12 @@ public class ViewPatients extends JFrame {
 
 		if (result == JOptionPane.OK_OPTION) {
 			try {
-				int from = Integer.parseInt(fromField.getText().trim());
-				int to = Integer.parseInt(toField.getText().trim());
+				Integer from = PatientIdUtil.parseFlexible(fromField.getText().trim());
+				Integer to = PatientIdUtil.parseFlexible(toField.getText().trim());
+				if (from == null || to == null) {
+					showStatusMessage("Invalid ID values", DANGER_COLOR);
+					return;
+				}
 
 				// ✅ Validation
 				if (from > to) {
@@ -1120,11 +1125,13 @@ public class ViewPatients extends JFrame {
 			List<Patient> list = PatientDAO.getPatientsByIdRange(from, to);
 
 			for (Patient p : list) {
-				model.addRow(new Object[] { false, p.getId(), p.getName(), p.getAge(), p.getGender(), p.getPhone(),
+				model.addRow(new Object[] { false, PatientIdUtil.format(p.getId()), p.getName(), p.getAge(), p.getGender(), p.getPhone(),
 						p.getPhone2(), p.getDisease(), p.getDate() });
 			}
 
-			showStatusMessage("Filtered by ID range (" + from + " - " + to + ")", SUCCESS_COLOR);
+			showStatusMessage(
+					"Filtered by ID range (" + PatientIdUtil.format(from) + " - " + PatientIdUtil.format(to) + ")",
+					SUCCESS_COLOR);
 
 		} catch (Exception e) {
 			showStatusMessage(e.getMessage(), DANGER_COLOR);
@@ -1138,8 +1145,8 @@ public class ViewPatients extends JFrame {
 			List<Patient> list = PatientDAO.getPatientsByAgeRange(from, to);
 
 			for (Patient p : list) {
-				model.addRow(new Object[] { false, p.getId(), p.getName(), p.getAge(), p.getGender(), p.getPhone(),
-						p.getDisease(), p.getDate() });
+				model.addRow(new Object[] { false, PatientIdUtil.format(p.getId()), p.getName(), p.getAge(), p.getGender(), p.getPhone(),
+						p.getPhone2(), p.getDisease(), p.getDate() });
 			}
 
 			showStatusMessage("Filtered by age range (" + from + " - " + to + ")", SUCCESS_COLOR);
@@ -1156,8 +1163,8 @@ public class ViewPatients extends JFrame {
 			List<Patient> list = PatientDAO.getPatientsByDateRange(from, to);
 
 			for (Patient p : list) {
-				model.addRow(new Object[] { false, p.getId(), p.getName(), p.getAge(), p.getGender(), p.getPhone(),
-						p.getDisease(), p.getDate() });
+				model.addRow(new Object[] { false, PatientIdUtil.format(p.getId()), p.getName(), p.getAge(), p.getGender(), p.getPhone(),
+						p.getPhone2(), p.getDisease(), p.getDate() });
 			}
 
 			showStatusMessage("Filtered by date range (" + from + " to " + to + ")", SUCCESS_COLOR);
@@ -1171,8 +1178,8 @@ public class ViewPatients extends JFrame {
 		try {
 			model.setRowCount(0);
 			for (Patient p : PatientDAO.getPatientsSortedByName())
-				model.addRow(new Object[] { false, p.getId(), p.getName(), p.getAge(), p.getGender(), p.getPhone(),
-						p.getDisease(), p.getDate() });
+				model.addRow(new Object[] { false, PatientIdUtil.format(p.getId()), p.getName(), p.getAge(), p.getGender(), p.getPhone(),
+						p.getPhone2(), p.getDisease(), p.getDate() });
 		} catch (Exception e) {
 			showStatusMessage("Sort failed", DANGER_COLOR);
 		}
@@ -1182,8 +1189,8 @@ public class ViewPatients extends JFrame {
 		try {
 			model.setRowCount(0);
 			for (Patient p : PatientDAO.getPatientsSortedByDate())
-				model.addRow(new Object[] { false, p.getId(), p.getName(), p.getAge(), p.getGender(), p.getPhone(),
-						p.getDisease(), p.getDate() });
+				model.addRow(new Object[] { false, PatientIdUtil.format(p.getId()), p.getName(), p.getAge(), p.getGender(), p.getPhone(),
+						p.getPhone2(), p.getDisease(), p.getDate() });
 		} catch (Exception e) {
 			showStatusMessage("Sort failed", DANGER_COLOR);
 		}
@@ -1193,8 +1200,8 @@ public class ViewPatients extends JFrame {
 		try {
 			model.setRowCount(0);
 			for (Patient p : PatientDAO.getPatientsSortedByAge())
-				model.addRow(new Object[] { false, p.getId(), p.getName(), p.getAge(), p.getGender(), p.getPhone(),
-						p.getDisease(), p.getDate() });
+				model.addRow(new Object[] { false, PatientIdUtil.format(p.getId()), p.getName(), p.getAge(), p.getGender(), p.getPhone(),
+						p.getPhone2(), p.getDisease(), p.getDate() });
 		} catch (Exception e) {
 			showStatusMessage("Sort failed", DANGER_COLOR);
 		}
@@ -1380,7 +1387,7 @@ public class ViewPatients extends JFrame {
 				for (Patient p : patients) {
 					Row row = sheet.createRow(ri++);
 
-					row.createCell(0).setCellValue(p.getId());
+				row.createCell(0).setCellValue(PatientIdUtil.format(p.getId()));
 					row.getCell(0).setCellStyle(ds);
 
 					row.createCell(1).setCellValue(p.getName());

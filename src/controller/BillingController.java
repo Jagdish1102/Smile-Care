@@ -7,6 +7,7 @@ import model.PatientBillingInfo;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import util.PatientIdUtil;
 
 public class BillingController {
     private final BillingDAO billingDAO;
@@ -25,7 +26,7 @@ public class BillingController {
 
     public String generateBillNumber(int patientDbId) {
         String datePart = LocalDate.now().format(DateTimeFormatter.ofPattern("ddMMyyyy"));
-        return "B" + patientDbId + "-" + datePart;
+        return "B" + PatientIdUtil.format(patientDbId) + "-" + datePart;
     }
 
     public BillCalculation calculateBill(double amount, double discountPct) {
