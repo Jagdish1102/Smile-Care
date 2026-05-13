@@ -786,7 +786,6 @@ public class BillingForm extends JFrame {
 				// ================= FONT =================
 
 				Font font = new Font("Monospaced", Font.PLAIN, 12);
-				Font signFont = new Font("SansSerif", Font.BOLD, 11);
 
 				g2d.setFont(font);
 
@@ -825,23 +824,6 @@ public class BillingForm extends JFrame {
 
 					y += lineHeight;
 				}
-
-				// ================= SIGNATURE RIGHT SIDE =================
-
-				y += 35;
-
-				g2d.setFont(signFont);
-
-				String signLine = "----------------------";
-				String signText = "Authorized Signature";
-
-				int signX = pageWidth - 220;
-
-				g2d.drawString(signLine, signX, y);
-
-				y += 18;
-
-				g2d.drawString(signText, signX + 20, y);
 
 				return Printable.PAGE_EXISTS;
 
